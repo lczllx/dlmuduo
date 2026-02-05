@@ -44,17 +44,15 @@ make -j$(nproc)
 - `./run_server_for_100k.sh` - 十万并发下启动 Echo 服务
 - `./check_limits.sh` - 检查系统对十万并发的限制
 
-### QPS 测试（4c8g 5M 带宽，正则路由）
+### QPS 测试（4c8g 5M 带宽）
 | 环境 | 接口 | 工具 | QPS | 带宽 | 说明 |
 |------|------|------|-----|------|------|
-| 4c8g | /hello | wrk 16线程 1万连接 | **19,437** | 1.95 MB/s | 空载，keep-alive，最高 |
-| 4c8g | /hello | wrk 8线程 1万连接 | **18,750** | 1.95 MB/s | 空载，keep-alive |
-| 4c8g | /hello | wrk 8线程 1万连接 | **15,364** | 1.47 MB/s | 十万长连接下 + wrk 1 万 |
-| 4c8g | /hello | WebBench 1万并发 | **16,720** | 2.33 MB/s | 每请求新建连接 |
+| 4c8g | /hello | wrk 16线程 1万连接 | **19,437** | 1.95 MB/s | 空载 |
+| 4c8g | /hello | wrk 8线程 1万连接 | 18,750 | 1.95 MB/s | 空载 |
+| 4c8g | /hello | wrk 8线程 1万连接 | 15,364 | 1.47 MB/s | 十万长连接下 + wrk 1 万 |
+| 4c8g | /hello | WebBench 1万并发 | 16,720 | 2.33 MB/s | 每请求新建连接 |
 | 2c2g | /hello | WebBench 2000 | 12,500+ | - | 历史数据 |
 | - | /index.html | WebBench | 8,700+ | - | 小文件请求 |
-
-压测时可在 `http.hpp` / `main.cc` 中启用 GetExact 注释，QPS 可提升（正则路由为当前默认）。
 
 ### 10 万并发连接
 - **连接数**: 100,000 并发 TCP 连接（单机多 IP 压测）

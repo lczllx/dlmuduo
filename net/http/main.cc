@@ -40,7 +40,6 @@ int main()
     server.SetThreadCnt(THREAD_CNT);
     server.SetBasedir(WWWROOT);
     server.Get("/hello", Hello);
-    // server.GetExact("/hello", Hello);  // 压测时启用，替代上方 Get
     server.Post("/login", Login);
     server.Put("/1234.txt", PutFile);
     server.Delete("/1234.txt", DelFile);
