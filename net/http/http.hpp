@@ -703,6 +703,7 @@ class HttpServer
     //由于每次进行请求处理时都需要对正则表达式进行编译，为了更好的性能，可以设置成std::vector<std::pair<std::regex/*编译完毕的正则表达式*/,Handler>>
     using Route_Table=std::vector<std::pair<std::regex,Handler>>;//本来不想这样设置，但是不设置要改的太多了
     Route_Table _get_route;
+    // std::unordered_map<std::string, Handler> _get_exact_route;  // 压测用 O(1) 精确路径
     Route_Table _put_route;
     Route_Table _delete_route;
     Route_Table _post_route;
@@ -836,7 +837,10 @@ class HttpServer
         {
             return FileHandler(req,resp);
         }
-        if(req._method=="GET" || req._method=="HEAD"){return Dispathcher(req,resp,_get_route);}
+        if(req._method=="GET" || req._method=="HEAD"){
+            // auto it = _get_exact_route.find(req._path); if(it != _get_exact_route.end()){ return it->second(req,resp); }  // 压测用
+            return Dispathcher(req,resp,_get_route);
+        }
         else if(req._method=="POST"){return Dispathcher(req,resp,_post_route);}
         else if(req._method=="PUT"){return Dispathcher(req,resp,_put_route);}
         else if(req._method=="DELETE"){return Dispathcher(req,resp,_delete_route);}
@@ -890,6 +894,7 @@ class HttpServer
         _server.SetMessageCallBack(std::bind(&HttpServer::OnMessage,this,std::placeholders::_1,std::placeholders::_2));
     }
     void Get(const std::string &pattern,const Handler &handler){ _get_route.push_back(std::make_pair(std::regex(pattern),handler));}
+    // void GetExact(const std::string &path,const Handler &handler){ _get_exact_route[path]=handler; }  // 压测用
     void Post(const std::string &pattern,const Handler &handler){ _post_route.push_back(std::make_pair(std::regex(pattern),handler));}
     void Put(const std::string &pattern,const Handler &handler){ _put_route.push_back(std::make_pair(std::regex(pattern),handler));}
     void Delete(const std::string &pattern,const Handler &handler){ _delete_route.push_back(std::make_pair(std::regex(pattern),handler));}

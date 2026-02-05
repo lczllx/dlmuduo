@@ -24,7 +24,8 @@ class EchoServer
     public:
 
     EchoServer(int port):_server(port){
-    _server.SetThreadCnt(4);           // 10万连接建议 4+ 线程
+    // 机器配置: 4c8g 用 8 线程; 2c2g 建议改为 2
+    _server.SetThreadCnt(8);
     _server.EnableInactiveRelease(300);  // 压测时保持 5 分钟，避免中途断开
     _server.SetMessageCallBack(std::bind(&EchoServer::OnMessage,this,std::placeholders::_1,std::placeholders::_2));
     _server.SetConnectedCallBack(std::bind(&EchoServer::OnConnected,this,std::placeholders::_1));

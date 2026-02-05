@@ -34,10 +34,13 @@ void DelFile(const HttpRequest &req, HttpResponse *rsp)
 }
 int main()
 {
+    // 机器配置: 4c8g 用 8 线程; 2c2g 建议改为 2
+    const int THREAD_CNT = 8;
     HttpServer server(8889, 300);  // 300 秒超时，便于压测
-    server.SetThreadCnt(4);         // 10万连接建议 4+ 线程
+    server.SetThreadCnt(THREAD_CNT);
     server.SetBasedir(WWWROOT);
     server.Get("/hello", Hello);
+    // server.GetExact("/hello", Hello);  // 压测时启用，替代上方 Get
     server.Post("/login", Login);
     server.Put("/1234.txt", PutFile);
     server.Delete("/1234.txt", DelFile);

@@ -21,10 +21,12 @@ cmake ..
 make -j$(nproc)
 
 # 运行示例（从build目录）
-../bin/test
+../bin/test         # Echo 服务
+../bin/http_server  # HTTP 服务（含 /hello 等路由）
 
 # 或者从项目根目录运行
 ./bin/test
+./bin/http_server
 ```
 
 ## 库的安装
@@ -35,18 +37,33 @@ make -j$(nproc)
 
 写了一个简单的回显服务器用于测试，在项目源码的/example 目录下的test.cc
 
-### QPS 测试
-| 并发数 | 接口 | 测试时长 | QPS | 说明 |
-|--------|------|----------|-----|------|
-| 2000   | /hello | 30秒 | **12,500+** | HTTP 接口，WebBench 压测 |
-| 1000   | /index.html | 30秒 | **8,700+** | 小文件请求 |
-| 500    | /index.html | 30秒 | **8,800+** | 小文件请求 |
-| 200    | /hello | 30秒 | **10,000+** | API 接口，响应小 |
-| 1000   | /hello | 60分钟 | **10,255** | API 接口，响应小 |
+### 压测脚本
+- `./run_qps_wrk.sh` - wrk keep-alive 压测（需先安装 `wrk`）
+- `./run_qps_wrk.sh --100k` - 十万长连接下 QPS 压测（需 ulimit -n >= 110000）
+- `./run_http_server_for_100k.sh` - 十万并发下启动 HTTP 服务
+- `./run_server_for_100k.sh` - 十万并发下启动 Echo 服务
+- `./check_limits.sh` - 检查系统对十万并发的限制
+
+### QPS 测试（4c8g 5M 带宽，正则路由）
+| 环境 | 接口 | 工具 | QPS | 带宽 | 说明 |
+|------|------|------|-----|------|------|
+| 4c8g | /hello | wrk 16线程 1万连接 | **19,437** | 1.95 MB/s | 空载，keep-alive，最高 |
+| 4c8g | /hello | wrk 8线程 1万连接 | **18,750** | 1.95 MB/s | 空载，keep-alive |
+| 4c8g | /hello | wrk 8线程 1万连接 | **15,364** | 1.47 MB/s | 十万长连接下 + wrk 1 万 |
+| 4c8g | /hello | WebBench 1万并发 | **16,720** | 2.33 MB/s | 每请求新建连接 |
+| 2c2g | /hello | WebBench 2000 | 12,500+ | - | 历史数据 |
+| - | /index.html | WebBench | 8,700+ | - | 小文件请求 |
+
+压测时可在 `http.hpp` / `main.cc` 中启用 GetExact 注释，QPS 可提升（正则路由为当前默认）。
 
 ### 10 万并发连接
 - **连接数**: 100,000 并发 TCP 连接（单机多 IP 压测）
-- **10 万连接下 QPS**: 约 **900**（2C2G 云服务器，维持 10 万连接时额外请求处理能力）
+- **4c8g 5M 带宽十万连接下 QPS**: **15,364**（wrk keep-alive，本机压测）
+- **2c2g 十万连接下 QPS**: 900（维持 10 万连接时）
+
+### 压测说明
+- **wrk**（推荐）：默认 keep-alive，复用连接，能反映真实请求处理能力
+- **WebBench**：每请求新建连接（Connection: close），测的是「建连+处理」能力，QPS 会偏低
 
 ### 网络吞吐量
 - **1000 并发**: 13+ MB/s
