@@ -42,6 +42,7 @@ if [[ "$1" == "--100k" ]]; then
     echo "=== 10 万连接下 QPS 压测 (wrk + keep-alive) ==="
     echo "1. 后台建立 10 万连接并保持..."
     LOG=$(mktemp -d)
+    BEFORE=$(ss -tn 2>/dev/null | grep ":$PORT " | grep ESTAB | wc -l)
     for ip in 127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4; do
         ./bin/concurrent_test $HOST $PORT 25000 90 $ip > "$LOG/${ip}.log" 2>&1 &
     done
@@ -49,7 +50,34 @@ if [[ "$1" == "--100k" ]]; then
     echo "2. 等待连接建立 (约 90 秒)..."
     sleep 90
 
-    echo "3. 运行 wrk 测 QPS ($WRK_THREADS 线程, $WRK_CONNECTIONS 连接, $WRK_DURATION)..."
+    echo "3. 验证连接建立情况..."
+    CURRENT=$(ss -tn 2>/dev/null | grep ":$PORT " | grep ESTAB | wc -l)
+    ESTABLISHED=$((CURRENT - BEFORE))
+    echo "   当前连接数: $CURRENT (新增: $ESTABLISHED)"
+    
+    # 检查各进程的连接建立情况
+    TOTAL_SUCCESS=0
+    for ip in 127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4; do
+        if [ -f "$LOG/${ip}.log" ]; then
+            SUCCESS=$(grep "最终统计" "$LOG/${ip}.log" | grep -oP "成功连接: \K[0-9]+" | head -1)
+            if [ -n "$SUCCESS" ]; then
+                TOTAL_SUCCESS=$((TOTAL_SUCCESS + SUCCESS))
+                echo "   $ip: $SUCCESS 个连接"
+            fi
+        fi
+    done
+    
+    if [ "$ESTABLISHED" -lt 90000 ]; then
+        echo "⚠️  警告: 只建立了 $ESTABLISHED 个连接，未达到10万（建议 >= 9万）"
+        echo "   可能原因: ulimit不足、系统限制、或连接建立失败"
+        echo "   继续测试，但结果可能不准确..."
+        echo ""
+    else
+        echo "✓ 连接建立成功: 约 $ESTABLISHED 个连接"
+        echo ""
+    fi
+
+    echo "4. 运行 wrk 测 QPS ($WRK_THREADS 线程, $WRK_CONNECTIONS 连接, $WRK_DURATION)..."
     wrk -t$WRK_THREADS -c$WRK_CONNECTIONS -d$WRK_DURATION --latency "http://$HOST:$PORT/hello"
 
     echo ""
