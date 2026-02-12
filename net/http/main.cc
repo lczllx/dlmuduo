@@ -3,17 +3,49 @@
 #define WWWROOT "./wwwroot/"
 std::string RequestStr(const HttpRequest &req) 
 {
-    std::stringstream ss;
-    ss << req._method << " " << req._path << " " << req._version << "\r\n";
+    //stringstream性能较差，优化掉
+    // std::stringstream ss;
+    // ss << req._method << " " << req._path << " " << req._version << "\r\n";
+    // for (auto &it : req._params) {
+    //     ss << it.first << ": " << it.second << "\r\n";
+    // }
+    // for (auto &it : req._headers) {
+    //     ss << it.first << ": " << it.second << "\r\n";
+    // }
+    // ss << "\r\n";
+    // ss << req._body;
+    // return ss.str();
+    // 估算大小，预分配空间
+    size_t total_size = 
+    req._method.size() + req._path.size() + 
+    req._version.size() + req._body.size() + 100;//
+    std::string result;
+    result.reserve(total_size);
+    
+    result += req._method;
+    result += " ";
+    result += req._path;
+    result += " ";
+    result += req._version;
+    result += "\r\n";
+    //拼接查询字符串参数
     for (auto &it : req._params) {
-        ss << it.first << ": " << it.second << "\r\n";
+        result += it.first;
+        result += ": ";
+        result += it.second;
+        result += "\r\n";
     }
+    //拼接头部
     for (auto &it : req._headers) {
-        ss << it.first << ": " << it.second << "\r\n";
+        result += it.first;
+        result += ": ";
+        result += it.second;
+        result += "\r\n";
     }
-    ss << "\r\n";
-    ss << req._body;
-    return ss.str();
+
+    result += "\r\n";
+    result += req._body;
+    return result;
 }
 void Hello(const HttpRequest &req, HttpResponse *rsp)
 {
@@ -35,7 +67,7 @@ void DelFile(const HttpRequest &req, HttpResponse *rsp)
 int main()
 {
     // 机器配置: 4c8g 用 8 线程; 2c2g 建议改为 2
-    const int THREAD_CNT = 8;
+    const int THREAD_CNT =4;
     HttpServer server(8889, 300);  // 300 秒超时，便于压测
     server.SetThreadCnt(THREAD_CNT);
     server.SetBasedir(WWWROOT);

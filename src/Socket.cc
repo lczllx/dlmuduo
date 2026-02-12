@@ -69,7 +69,8 @@ int Socket::Accept()//可以使用 sockaddr_storage，避免 IPv4/IPv6 不兼容
     int newfd=accept(_sockfd,NULL,NULL);
     if(newfd<0)
     {
-        L_ERROR("socket Accept failed");
+        int e = errno;
+        L_ERROR("socket Accept failed errno=%d (%s)", e, strerror(e));
         return -1;
     }
     return newfd;

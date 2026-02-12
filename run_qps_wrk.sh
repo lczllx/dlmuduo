@@ -5,13 +5,13 @@
 # 用法: 
 #   1. 安装 wrk: sudo apt install wrk
 #   2. 先启动 ./bin/http_server (十万并发需用 run_server_for_100k.sh 启动以调高 ulimit)
-#   3. ./run_qps_wrk.sh          # 普通压测: 8 线程 10000 连接
+#   3. ./run_qps_wrk.sh          # 普通压测: 4 线程 10000 连接（4核机推荐）
 #   4. ./run_qps_wrk.sh --100k   # 十万并发压测: 先建立 10 万连接，再测 QPS
 
 HOST=127.0.0.1
 PORT=8889
 # 4c8g 配置
-WRK_THREADS=8
+WRK_THREADS=4
 WRK_CONNECTIONS=10000
 WRK_DURATION=30s
 
