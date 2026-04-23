@@ -1,8 +1,11 @@
 #ifndef MUDUO_LOGGER_H
 #define MUDUO_LOGGER_H
 
+#include <cstdio>
+#include <cstdlib>
 #include <string>
-#include <iostream>
+
+#include "log_system/Logger.hpp"
 
 namespace muduo {
 
@@ -14,40 +17,65 @@ enum LogLevel {
     FATAL
 };
 
+// 与原有 L_DEBUG("fmt", ...) 用法兼容；底层走 lcz 异步/同步日志器
 class Logger {
 private:
     LogLevel _level;
-    std::string _message;
     const char* _file;
     int _line;
-    
-    static const char* LevelToString(LogLevel level);//将日志级别转换为字符串
-    static std::string GetCurrentTime();//获取当前时间
+    std::string _message;
 
 public:
-    Logger(LogLevel level, const char* file, int line);
-    ~Logger();
-    
-    // 支持函数调用语法
-    template<typename... Args>
+    Logger(LogLevel level, const char* file, int line)
+        : _level(level), _file(file), _line(line) {}
+
+    ~Logger() {
+        lcz::Logger::ptr root = lcz::LoggerManager::getInstance().rootLogger();
+        if (!root) {
+            return;
+        }
+        const std::string f = _file ? _file : "";
+        const size_t line = static_cast<size_t>(_line > 0 ? _line : 0);
+        switch (_level) {
+        case DEBUG:
+            root->Debug(f, line, "%s", _message.c_str());
+            break;
+        case INFO:
+            root->Info(f, line, "%s", _message.c_str());
+            break;
+        case WARN:
+            root->Warn(f, line, "%s", _message.c_str());
+            break;
+        case ERROR:
+            root->Error(f, line, "%s", _message.c_str());
+            break;
+        case FATAL:
+            root->Fatal(f, line, "%s", _message.c_str());
+            std::abort();
+            break;
+        default:
+            break;
+        }
+    }
+
+    template <typename... Args>
     void operator()(const char* format, Args... args) {
         char buffer[4096];
         snprintf(buffer, sizeof(buffer), format, args...);
         _message = buffer;
     }
-    
-    // 支持无参数的调用
-    void operator()(const char* msg);
-    void operator()(const std::string& msg);
+
+    void operator()(const char* msg) { _message = msg ? msg : ""; }
+
+    void operator()(const std::string& msg) { _message = msg; }
 };
 
-}  
+}  // namespace muduo
 
-// 日志宏 - 带文件名和行号
 #define L_DEBUG muduo::Logger(muduo::DEBUG, __FILE__, __LINE__)
-#define L_INFO  muduo::Logger(muduo::INFO,  __FILE__, __LINE__)
-#define L_WARN  muduo::Logger(muduo::WARN,  __FILE__, __LINE__)
+#define L_INFO  muduo::Logger(muduo::INFO, __FILE__, __LINE__)
+#define L_WARN  muduo::Logger(muduo::WARN, __FILE__, __LINE__)
 #define L_ERROR muduo::Logger(muduo::ERROR, __FILE__, __LINE__)
 #define L_FATAL muduo::Logger(muduo::FATAL, __FILE__, __LINE__)
 
-#endif  
+#endif

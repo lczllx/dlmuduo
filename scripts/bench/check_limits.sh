@@ -1,5 +1,11 @@
 #!/bin/bash
 # 检查系统对 10 万并发的限制（2C2G 云服务器常见瓶颈）
+# 路径: scripts/bench/check_limits.sh
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+BIN="$REPO_ROOT/bin"
+
 echo "=== 10万连接限制检查 ==="
 echo ""
 echo "1. 进程 fd 限制 (ulimit -n):"
@@ -27,6 +33,6 @@ echo "=== 要测 10 万并发，可选 ==="
 echo "  - QPS 压测: ./WebBench-master/webbench -c 1000 -t 30 http://127.0.0.1:8889/hello"
 echo "    (2C2G 建议 -c 1000~2000，webbench 每客户端 fork 一进程)"
 echo "  - 多机压测: 服务器放本机/其他机，4台客户端各执行:"
-echo "    ./bin/concurrent_test <服务器IP> 8889 25000 60"
+echo "    $BIN/concurrent_test <服务器IP> 8889 25000 60"
 echo "  - 云端压测服务: k6 cloud、阿里云 PTS 等，分布式发起 10 万连接"
-echo "  - 换环境: 物理机或 4C8G+ 云实例，再跑 ./run_qps_wrk.sh --100k"
+echo "  - 换环境: 物理机或 4C8G+ 云实例，再跑 $SCRIPT_DIR/run_qps_wrk.sh --100k"

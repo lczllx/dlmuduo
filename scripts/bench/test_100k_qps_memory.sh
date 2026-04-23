@@ -1,5 +1,10 @@
 #!/bin/bash
 # 测试十万并发连接下的 QPS 和内存占用
+# 路径相对于仓库根: scripts/bench/test_100k_qps_memory.sh
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+BIN="$REPO_ROOT/bin"
 
 HOST=127.0.0.1
 PORT=8889
@@ -9,7 +14,7 @@ WRK_DURATION=30s
 
 # 检查服务器是否运行
 if ! ss -tlnp 2>/dev/null | grep -q ":$PORT "; then
-    echo "请先启动 HTTP 服务: ./bin/http_server"
+    echo "请先启动 HTTP 服务: $BIN/http_server（十万并发可用 $SCRIPT_DIR/run_http_server_for_100k.sh）"
     exit 1
 fi
 
@@ -164,7 +169,7 @@ MEM_BEFORE_MB=$(echo "scale=2; $MEM_BEFORE / 1024" | bc 2>/dev/null || echo "0")
 echo "建立连接前内存: RSS=${MEM_BEFORE_MB}MB"
 
 for ip in 127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4; do
-    ./bin/concurrent_test $HOST $PORT 25000 90 $ip > "$LOG/${ip}.log" 2>&1 &
+    "$BIN/concurrent_test" $HOST $PORT 25000 90 $ip > "$LOG/${ip}.log" 2>&1 &
 done
 
 echo "等待连接建立（90秒）..."

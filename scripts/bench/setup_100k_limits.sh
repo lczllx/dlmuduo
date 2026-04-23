@@ -1,5 +1,8 @@
 #!/bin/bash
 # 配置系统参数以支持10万并发连接测试
+# 路径: scripts/bench/setup_100k_limits.sh
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "=== 配置10万并发连接所需的系统参数 ==="
 echo ""
@@ -7,7 +10,7 @@ echo ""
 # 检查是否为root
 if [ "$EUID" -ne 0 ]; then 
     echo "需要root权限，请使用 sudo 运行"
-    echo "用法: sudo ./setup_100k_limits.sh"
+    echo "用法: sudo $SCRIPT_DIR/setup_100k_limits.sh"
     exit 1
 fi
 
@@ -72,4 +75,4 @@ echo ""
 echo "=== 重要提示 ==="
 echo "1. 确保 ulimit -n >= 110000（已在 limits.d 中配置）"
 echo "2. 服务器和客户端都需要这些设置"
-echo "3. 现在可以重新运行测试: ./test_qps_cpu.sh"
+echo "3. 现在可以重新运行测试: $SCRIPT_DIR/test_qps_cpu.sh"

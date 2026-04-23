@@ -1,5 +1,10 @@
 #!/bin/bash
 # 测试1万和10万连接下的QPS和CPU利用率
+# 路径相对于仓库根: scripts/bench/test_qps_cpu.sh
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+BIN="$REPO_ROOT/bin"
 
 HOST=127.0.0.1
 PORT=8889
@@ -10,7 +15,7 @@ WRK_DURATION=30s
 
 # 检查服务器是否运行
 if ! ss -tlnp 2>/dev/null | grep -q ":$PORT "; then
-    echo "请先启动 HTTP 服务: ./bin/http_server"
+    echo "请先启动 HTTP 服务: $BIN/http_server（十万并发可用 $SCRIPT_DIR/run_http_server_for_100k.sh）"
     exit 1
 fi
 
@@ -140,7 +145,7 @@ LOG=$(mktemp -d)
 BEFORE_CONN2=$(ss -tn 2>/dev/null | grep ":$PORT " | grep ESTAB | wc -l)
 
 for ip in 127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4; do
-    ./bin/concurrent_test $HOST $PORT 25000 90 $ip > "$LOG/${ip}.log" 2>&1 &
+    "$BIN/concurrent_test" $HOST $PORT 25000 90 $ip > "$LOG/${ip}.log" 2>&1 &
 done
 
 echo "等待连接建立（90秒）..."

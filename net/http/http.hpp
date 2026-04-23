@@ -520,6 +520,7 @@ class HttpContext
     HttpRecvStatus _recv_statu;//当前接收及解析的阶段状态
     //HttpRecvStatu _recv_statu;//当前接收及解析的阶段状态
     HttpRequest _request;//已经解析得到的请求信息
+    std::unordered_map<std::string,std::string> _dispatch_cache;//dispatcher匹配时的缓存
     private:
      // 解析请求行，格式如："GET /path?query HTTP/1.1"
     bool ParseHttpLine(const std::string &line)

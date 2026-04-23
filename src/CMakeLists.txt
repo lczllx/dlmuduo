@@ -6,7 +6,6 @@ set(SOURCES
     Channel.cc
     Connection.cc
     EventLoop.cc
-    Logger.cc
     LoopThread.cc
     LoopThreadPool.cc
     Poller.cc

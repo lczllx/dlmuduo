@@ -2,11 +2,15 @@
 # 正确的 QPS 压测脚本 - 使用 wrk (支持 HTTP keep-alive，复用连接)
 # WebBench 每个请求新建连接，测的是「建连+处理」能力，无法反映 muduo 真实 QPS
 #
-# 用法: 
+# 用法（在仓库根目录或任意目录均可）: 
 #   1. 安装 wrk: sudo apt install wrk
-#   2. 先启动 ./bin/http_server (十万并发需用 run_server_for_100k.sh 启动以调高 ulimit)
-#   3. ./run_qps_wrk.sh          # 普通压测: 4 线程 10000 连接（4核机推荐）
-#   4. ./run_qps_wrk.sh --100k   # 十万并发压测: 先建立 10 万连接，再测 QPS
+#   2. 先启动 bin/http_server（十万并发用 scripts/bench/run_http_server_for_100k.sh）
+#   3. ./scripts/bench/run_qps_wrk.sh          # 普通压测: 4 线程 10000 连接（4核机推荐）
+#   4. ./scripts/bench/run_qps_wrk.sh --100k   # 十万并发压测: 先建立 10 万连接，再测 QPS
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+BIN="$REPO_ROOT/bin"
 
 HOST=127.0.0.1
 PORT=8889
@@ -21,8 +25,8 @@ if ! command -v wrk &>/dev/null; then
 fi
 
 if ! ss -tlnp 2>/dev/null | grep -q ":$PORT "; then
-    echo "请先启动 HTTP 服务: ./bin/http_server"
-    echo "十万并发压测请用: ./run_http_server_for_100k.sh"
+    echo "请先启动 HTTP 服务: $BIN/http_server"
+    echo "十万并发压测请用: $SCRIPT_DIR/run_http_server_for_100k.sh"
     exit 1
 fi
 
@@ -44,7 +48,7 @@ if [[ "$1" == "--100k" ]]; then
     LOG=$(mktemp -d)
     BEFORE=$(ss -tn 2>/dev/null | grep ":$PORT " | grep ESTAB | wc -l)
     for ip in 127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4; do
-        ./bin/concurrent_test $HOST $PORT 25000 90 $ip > "$LOG/${ip}.log" 2>&1 &
+        "$BIN/concurrent_test" $HOST $PORT 25000 90 $ip > "$LOG/${ip}.log" 2>&1 &
     done
 
     echo "2. 等待连接建立 (约 90 秒)..."
@@ -87,7 +91,7 @@ if [[ "$1" == "--100k" ]]; then
 else
     echo "=== muduo QPS 压测 (wrk + keep-alive) ==="
     echo "4c8g: $WRK_THREADS 线程, $WRK_CONNECTIONS 连接, $WRK_DURATION"
-    echo "十万并发压测请加参数: ./run_qps_wrk.sh --100k"
+    echo "十万并发压测请加参数: $SCRIPT_DIR/run_qps_wrk.sh --100k"
     echo ""
     wrk -t$WRK_THREADS -c$WRK_CONNECTIONS -d$WRK_DURATION --latency "http://$HOST:$PORT/hello"
 fi

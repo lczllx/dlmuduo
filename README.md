@@ -37,12 +37,20 @@ make -j$(nproc)
 
 写了一个简单的回显服务器用于测试，在项目源码的/example 目录下的test.cc
 
-### 压测脚本
-- `./run_qps_wrk.sh` - wrk keep-alive 压测（需先安装 `wrk`）
-- `./run_qps_wrk.sh --100k` - 十万长连接下 QPS 压测（需 ulimit -n >= 110000）
-- `./run_http_server_for_100k.sh` - 十万并发下启动 HTTP 服务
-- `./run_server_for_100k.sh` - 十万并发下启动 Echo 服务
-- `./check_limits.sh` - 检查系统对十万并发的限制
+### 压测脚本（`scripts/bench/`，在仓库根目录执行）
+- `./scripts/bench/run_qps_wrk.sh` - wrk keep-alive 压测（需先安装 `wrk`）
+- `./scripts/bench/run_qps_wrk.sh --100k` - 十万长连接下 QPS 压测（需 ulimit -n >= 110000）
+- `./scripts/bench/run_http_server_for_100k.sh` - 十万并发下启动 HTTP 服务
+- `./scripts/bench/run_server_for_100k.sh` - 十万并发下启动 Echo 服务
+- `./scripts/bench/check_limits.sh` - 检查系统对十万并发的限制
+- `./scripts/bench/test_qps_cpu.sh` - 1 万 / 十万长连接下 QPS + CPU 采样
+- `./scripts/bench/test_100k_qps_memory.sh` - QPS + 内存（RSS/VSS）采样
+- `sudo ./scripts/bench/setup_100k_limits.sh` -  sysctl 调优（十万并发前建议执行）
+- 脚本说明汇总：`docs/BENCH_SCRIPTS.md`
+
+### 文档目录（`docs/`）
+
+性能、路由与序列化等说明均放在 **`docs/`**，例如：`PERFORMANCE_OPTIMIZATION.md`、`CPU_UTILIZATION_ANALYSIS.md`、`QPS_VARIATION_ANALYSIS.md`、`PERFORMANCE_TARGET.md`、`ROUTE_OPTIMIZATION_GUIDE.md`、`PROTOBUF_INTEGRATION_PLAN.md` 等。
 
 ### QPS 测试
 
@@ -52,7 +60,7 @@ make -j$(nproc)
 |------|------|------|-----|---------------|------|
 | 4c8g 云 | /hello | wrk **4线程** 1万连接 | **40,352** | RSS: 212MB | 空载（无长连接背景） |
 | 4c8g 云 | /hello | wrk 4线程 1万连接 | **34,027** | RSS: 880MB | **十万长连接下**（约 20 万连接，QPS降15%） |
-| 4c8g 云 | /hello | wrk 4线程 1万连接 | 37,953 | CPU: 156% | 空载（test_qps_cpu.sh 含 CPU 监控） |
+| 4c8g 云 | /hello | wrk 4线程 1万连接 | 37,953 | CPU: 156% | 空载（`scripts/bench/test_qps_cpu.sh` 含 CPU 监控） |
 | 4c8g 云 | /hello | wrk 4线程 1万连接 | 34,330 | CPU: 146% | 十万长连接下（约 20 万连接背景） |
 | 4c8g 云 | /hello | wrk 8线程 1万连接 | 36,996 | 158% | 空载（字符串优化后） |
 | 4c8g 云 | /hello | wrk 8线程 1万连接 | 32,741 | 153% | 十万长连接下（字符串优化后） |
@@ -83,10 +91,10 @@ make -j$(nproc)
 
 **历史数据**: 4c8g 5M 带宽十万连接下 QPS 15,364（不同测试环境）；2c2g 十万连接下 QPS 900
 
-**QPS 几千变动说明**：同一环境不同次测试差 2k～6k 属正常，主要与 **wrk 线程数**（4 核机用 4 线程更优）、**是否同时跑 CPU 监控**、**是否在大量长连接下压测** 有关，详见 `QPS_VARIATION_ANALYSIS.md`。
+**QPS 几千变动说明**：同一环境不同次测试差 2k～6k 属正常，主要与 **wrk 线程数**（4 核机用 4 线程更优）、**是否同时跑 CPU 监控**、**是否在大量长连接下压测** 有关，详见 `docs/QPS_VARIATION_ANALYSIS.md`。
 
 ### 压测说明
-- **wrk**（推荐）：默认 keep-alive，复用连接；4 核机建议 `-t4`，与 `run_qps_wrk.sh` 一致
+- **wrk**（推荐）：默认 keep-alive，复用连接；4 核机建议 `-t4`，与 `scripts/bench/run_qps_wrk.sh` 一致
 - **WebBench**：每请求新建连接（Connection: close），测的是「建连+处理」能力，QPS 会偏低
 
 ### 网络吞吐量
