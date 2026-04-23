@@ -9,6 +9,12 @@ lib/
 *.so
 *.dylib
 
+# 勿提交：误放在源码树里的可执行文件 / 压测二进制 / 大包
+net/http/main
+WebBench-master/webbench
+WebBench-master.zip
+wwwroot/*.bin
+
 # IDE文件
 .vscode/
 .idea/
@@ -45,5 +51,5 @@ net/notebook_api/
 CONCURRENT_TEST.md
 SESSION_SUMMARY.md
 run_100k.sh
-CPU_UTILIZATION_ANALYSIS.md
-QPS_VARIATION_ANALYSIS.md
+docs/CPU_UTILIZATION_ANALYSIS.md
+docs/QPS_VARIATION_ANALYSIS.md
