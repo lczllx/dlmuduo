@@ -24,16 +24,15 @@ namespace lcz
         };
         static const char *toString(LogLevel::value level) 
         {
-            switch(level) 
+            switch(level)
             {
-                
+                case LogLevel::value::UNKNOW: return "UNKNOW";
                 case LogLevel::value::DEBUG: return "DEBUG";
                 case LogLevel::value::INFO: return "INFO";
                 case LogLevel::value::WARN: return "WARN";
                 case LogLevel::value::ERROR: return "ERROR";
                 case LogLevel::value::FATAL: return "FATAL";
                 case LogLevel::value::OFF: return "OFF";
-                
             }
             return "UNKNOW";
         }

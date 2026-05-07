@@ -95,7 +95,7 @@ namespace lcz
       class TabFormatItem:public FormatItem
       {
         public:
-        virtual void format(std::ostream &os,const Logmsg &msg)override
+        virtual void format(std::ostream &os,const Logmsg &)override
         {
               os<<"\t";
         }
@@ -104,7 +104,7 @@ namespace lcz
       class NlineFormatItem:public FormatItem
       {
         public:
-        virtual void format(std::ostream &os,const Logmsg &msg)override
+        virtual void format(std::ostream &os,const Logmsg &)override
         {
               os<<"\n";
         }
@@ -117,7 +117,7 @@ namespace lcz
         OtherFormatItem(const std::string &str)
             :_str(str)
             {}
-         virtual void format(std::ostream &os,const Logmsg &msg)override
+         virtual void format(std::ostream &os,const Logmsg &)override
         {
              os<<_str;
         }

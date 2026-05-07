@@ -14,8 +14,10 @@ void Acceptor::HandleRead() {
 }
 
 int Acceptor::CreateServer(int port) {
-    bool ret = _socket.CreateServer(port);
-    assert(ret == true);
+    if (!_socket.CreateServer(port)) {
+        L_ERROR("CreateServer failed for port %d", port);
+        abort();
+    }
     return _socket.Fd();
 }
 

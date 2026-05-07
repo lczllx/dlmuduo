@@ -117,6 +117,7 @@ namespace lcz
         virtual void log(const char*data,size_t len)override
         {
             std::cout.write(data,len);
+            std::cout.flush();//刷新缓冲区
         }
     };
     //固定文件落地

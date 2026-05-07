@@ -743,9 +743,9 @@ class LoggerBuilder
 {
 public:
     LoggerBuilder()
-        : _logger_type(LoggerType::LOGGER_ASYNC),
-          _level(LogLevel::value::DEBUG),
-          _looper_type(AsyncType::ASYNC_SAFE)
+        : _looper_type(AsyncType::ASYNC_SAFE),
+          _logger_type(LoggerType::LOGGER_ASYNC),
+          _level(LogLevel::value::DEBUG)
     {}
 
     void buildloggertype(LoggerType type) { _logger_type = type; }

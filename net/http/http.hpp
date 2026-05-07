@@ -10,7 +10,7 @@
 #include "../../include/m_ser.hpp"
 
 #define DEFAULT_TIMEOUT 10
-std::unordered_map<int,std::string> statu_msg={
+static std::unordered_map<int,std::string> statu_msg={
             {100, "Continue"},
             {101, "Switching Protocol"},
             {102, "Processing"},
@@ -74,7 +74,7 @@ std::unordered_map<int,std::string> statu_msg={
             {510, "Not Extended"},
             {511, "Network Authentication Required"}
         };
-         std::unordered_map<std::string, std::string> mime_msg = {
+         static std::unordered_map<std::string, std::string> mime_msg = {
             {".aac", "audio/aac"},
             {".abw", "application/x-abiword"},
             {".arc", "application/x-freearc"},
@@ -428,19 +428,27 @@ class HttpRequest
         std::string res=GetHeader("Content-Length");
         return std::stol(res);
     }
-    //是否是短链接
-    bool IsClose()const 
-    {
-        if (HasHeader("Connection") && GetHeader("Connection") == "keep-alive") {return false;}
+    // 判断是否需要关闭连接
+    // HTTP/1.1 默认 keep-alive，只有显式 Connection: close 才关闭
+    // HTTP/1.0 默认 close，只有显式 Connection: keep-alive 才保持
+    bool IsClose() const {
+        if (_version == "HTTP/1.1" || _version == "HTTP/1.0") {
+            if (HasHeader("Connection")) {
+                std::string v = GetHeader("Connection");
+                std::transform(v.begin(), v.end(), v.begin(), ::tolower);
+                if (v == "close") return true;
+                if (v == "keep-alive") return false;
+            }
+            return _version != "HTTP/1.1"; // 1.1 default keep-alive, 1.0 default close
+        }
+        // HTTP/0.9 fallback: 默认 close
+        if (HasHeader("Connection")) {
+            std::string v = GetHeader("Connection");
+            std::transform(v.begin(), v.end(), v.begin(), ::tolower);
+            if (v == "keep-alive") return false;
+        }
         return true;
     }
-    // bool IsClose()const!!!!!!!罪魁祸首nmlgb
-    //{
-    // if(HasHeader("Connection") && (GetHeader("Connection")=="Close"||GetHeader("Connection")=="close")) {
-    //     return true;   
-    // }
-    // return false;     
-    //}
 };
 
 //存储http响应信息要素，提供简单接口
@@ -485,6 +493,12 @@ class HttpResponse
         _body=body;
         SetHeader("Content-Type",type);
     }
+    //设置状态码
+    void SetStatu(int statu=302)
+    {
+        _statu=statu;
+    }
+    //重定向响应
     void SetRedirect(const std::string &url,int statu=302)
     {
         _statu=statu;
@@ -685,11 +699,16 @@ class HttpContext
     {
         //L_DEBUG("开始解析HTTP请求,当前状态: %d", (int)_recv_statu);
         switch(_recv_statu)
-        {   //不能break，因为处理完一个要接着下一个
-            //可以使用 C++17 [[fallthrough]] 属性标记贯穿意图，避免编译器警告且提示阅读者这是有意设计，而非遗漏 break
+        {
             case HttpRecvStatus::RECV_HTTP_LINE:RecvHttpLine(buf);
+                [[fallthrough]];
             case HttpRecvStatus::RECV_HTTP_HEAD:RecvHttpHead(buf);
+                [[fallthrough]];
             case HttpRecvStatus::RECV_HTTP_BODY:RecvHttpBody(buf);
+                break;
+            case HttpRecvStatus::RECV_HTTP_ERROR:
+            case HttpRecvStatus::RECV_HTTP_OVER:
+                break;
         }
          //L_DEBUG("解析完成，新状态: %d", (int)_recv_statu);
         return;
@@ -741,8 +760,8 @@ class HttpServer
         }else{
             resp->SetHeader("Connection","keep-alive");
         }
-        //如果响应体不为空且没有设置Content-Length头部，自动设置
-        if((!resp->_body.empty()) && resp->HasHeader("Content-Length")==false)
+        // 始终设置 Content-Length（keep-alive 下空 body 也需要 Content-Length: 0）
+        if(resp->HasHeader("Content-Length")==false)
         {
             resp->SetHeader("Content-Length",std::to_string(resp->_body.size()));
         }
@@ -897,8 +916,10 @@ class HttpServer
     void Put(const std::string &pattern,const Handler &handler){ _put_route.push_back(std::make_pair(std::regex(pattern),handler));}
     void Delete(const std::string &pattern,const Handler &handler){ _delete_route.push_back(std::make_pair(std::regex(pattern),handler));}
     void SetBasedir(const std::string &path){
-        bool ret=Util::IsDirectory(path);
-        assert(ret==true);
+        if (!Util::IsDirectory(path)) {
+            L_ERROR("SetBasedir failed: %s is not a directory", path.c_str());
+            abort();
+        }
         _basedir=path;
     }
     void SetThreadCnt(int cnt){_server.SetThreadCnt(cnt);}

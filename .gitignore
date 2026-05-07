@@ -53,3 +53,4 @@ SESSION_SUMMARY.md
 run_100k.sh
 docs/CPU_UTILIZATION_ANALYSIS.md
 docs/QPS_VARIATION_ANALYSIS.md
+scripts/shortener/*.txt
