@@ -1,4 +1,5 @@
 #include "shortener.hpp"
+#include <atomic>
 #include <chrono>
 
 void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
@@ -12,12 +13,18 @@ void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
     }
 
     MYSQL* conn = g_mysql->Acquire();
+    if (!conn) {
+        L_ERROR("Failed to acquire MySQL connection");
+        rsp->SetStatu(500);
+        rsp->SetContent("Database Error", "text/plain");
+        return;
+    }
 
     char escaped[8192];
     char sql[16384];
     mysql_real_escape_string(conn, escaped, long_url.c_str(), long_url.size());
 
-    static long seq = 0;
+    static std::atomic<long> seq{0};
     snprintf(sql, sizeof(sql),
         "INSERT INTO short_url (code, long_url) VALUES ('TMP_%d_%ld', '%s')",
         getpid(), ++seq, escaped);
@@ -67,6 +74,12 @@ void Redirect(const HttpRequest& req, HttpResponse* rsp)
     if (long_url.empty()) {
         L_DEBUG("Redis miss, querying MySQL for code=%s", code.c_str());
         MYSQL* conn = g_mysql->Acquire();
+        if (!conn) {
+            L_ERROR("Redirect: Failed to acquire MySQL connection");
+            rsp->SetStatu(500);
+            rsp->SetContent("Database Error", "text/plain");
+            return;
+        }
 
         char escaped[32];
         mysql_real_escape_string(conn, escaped, code.c_str(), code.size());

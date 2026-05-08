@@ -12,10 +12,9 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 WORKDIR /app
 
-COPY muduo/ ./muduo/
+COPY . .
 
-RUN cd muduo && \
-    mkdir -p build && cd build && \
+RUN mkdir -p build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release && \
     make shortener_server -j$(nproc)
 
@@ -29,7 +28,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     mariadb-connector-c \
     jsoncpp
 
-COPY --from=builder /app/muduo/bin/shortener_server /app/shortener_server
+COPY --from=builder /app/bin/shortener_server /app/shortener_server
 
 WORKDIR /app
 EXPOSE 8889

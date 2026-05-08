@@ -20,10 +20,12 @@ public:
         }
     }
 
-    bool Connect(int pool_size = 4)
+    bool Connect(const char* host = "127.0.0.1", int port = 6379, int pool_size = 4)
     {
+        _host = host;
+        _port = port;
         for (int i = 0; i < pool_size; ++i) {
-            redisContext *c = redisConnect("127.0.0.1", 6379);
+            redisContext *c = redisConnect(host, port);
             if (!c) return false;
             struct timeval tv = {0, 50000};
             redisSetTimeout(c, tv);
@@ -74,6 +76,8 @@ private:
     std::mutex _mutex;
     std::condition_variable _cond;
     std::queue<redisContext *> _conns;
+    std::string _host;
+    int _port = 6379;
     int _default_ttl_sec;
 
     redisContext *Acquire()
@@ -82,8 +86,17 @@ private:
         _cond.wait(lock, [this] { return !_conns.empty(); });
         redisContext *c = _conns.front();
         _conns.pop();
+        lock.unlock();
+
+        if (c->err != 0 && redisReconnect(c) != REDIS_OK) {
+            redisFree(c);
+            c = redisConnect(_host.c_str(), _port);
+            if (c) {
+                struct timeval tv = {0, 50000};
+                redisSetTimeout(c, tv);
+            }
+        }
         return c;
-        // 锁在此释放，Redis I/O 在锁外执行
     }
 
     void Release(redisContext *c)

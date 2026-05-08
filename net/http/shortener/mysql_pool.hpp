@@ -59,11 +59,27 @@ public:
         MYSQL *mysql;
         {
             std::unique_lock<std::mutex> lock(_mutex);
-            // 等待init完成解锁
             _m_cond_v.wait(lock, [this]
-                           { return !_mysqls.empty(); }); // wait需要支持手动解锁，lock_guard不行
+                           { return !_mysqls.empty(); });
             mysql = _mysqls.front();
             _mysqls.pop();
+        }
+        if (mysql_ping(mysql) != 0) {
+            mysql_close(mysql);
+            mysql = mysql_init(nullptr);
+            if (mysql) {
+                unsigned int timeout = 2;
+                mysql_options(mysql, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
+                mysql_options(mysql, MYSQL_OPT_READ_TIMEOUT, &timeout);
+                if (mysql_real_connect(mysql, _m_host.c_str(), _m_user.c_str(),
+                                       _m_password.c_str(), _m_db.c_str(),
+                                       _m_port, nullptr, 0)) {
+                    mysql_set_character_set(mysql, "utf8mb4");
+                } else {
+                    mysql_close(mysql);
+                    mysql = nullptr;
+                }
+            }
         }
         return mysql;
     }
