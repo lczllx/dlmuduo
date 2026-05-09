@@ -57,13 +57,14 @@ int main()
     const char* base_url = std::getenv("BASE_URL");
     if (base_url && base_url[0]) g_base_url = base_url;
 
-    HttpServer server(8889, 10);
+    int port = safe_stoi(env("PORT", "8889"), 8889);
+    HttpServer server(port, 10);
     server.SetThreadCnt(4);
     server.Get("/", HomePage);
     server.Get("/health", HealthCheck);
     server.Post("/api/shorten", ApiShorten);
     server.Get("/([A-Za-z0-9]+)", Redirect);
-    L_INFO("Short URL server starting on :8889");
+    L_INFO("Short URL server starting on :%d", port);
     server.Listen();
 
     return 0;

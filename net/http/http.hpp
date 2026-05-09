@@ -457,19 +457,21 @@ class HttpResponse
     public:
     int _statu;///状态码
     bool _redirect_flag;//重定向设置符
+    bool _deferred;//异步处理标记
     std::string _body;//响应正文
     std::string _redirect_url;//重定向的url
     std::unordered_map<std::string,std::string>_headers;//头部字段
+    PtrConnection _conne;//异步handler通过它发回响应
 
     public:
-    HttpResponse():_statu(200),_redirect_flag(false){}
-    HttpResponse(int statu):_statu(statu),_redirect_flag(false){}
+    HttpResponse():_statu(200),_redirect_flag(false),_deferred(false){}
+    HttpResponse(int statu):_statu(statu),_redirect_flag(false),_deferred(false){}
     //重置接口
     void ReSet()
     {
         _statu=200;_headers.clear();
         _redirect_url.clear();_body.clear();
-        _redirect_flag=false;
+        _redirect_flag=false;_deferred=false;
     }
     //插入头部字段
     void SetHeader(const std::string &key,const std::string &val){ _headers.insert(std::make_pair(key, val));}
@@ -535,6 +537,8 @@ class HttpContext
     //HttpRecvStatu _recv_statu;//当前接收及解析的阶段状态
     HttpRequest _request;//已经解析得到的请求信息
     std::unordered_map<std::string,std::string> _dispatch_cache;//dispatcher匹配时的缓存
+    public:
+    bool _async_pending;//异步handler执行中，OnMessage暂停处理
     private:
      // 解析请求行，格式如："GET /path?query HTTP/1.1"
     bool ParseHttpLine(const std::string &line)
@@ -688,9 +692,9 @@ class HttpContext
         return true;
     }
     public:
-    HttpContext():_resp_statu(200),_recv_statu(HttpRecvStatus::RECV_HTTP_LINE){}
+    HttpContext():_resp_statu(200),_recv_statu(HttpRecvStatus::RECV_HTTP_LINE),_async_pending(false){}
     //重置接口
-    void ReSet(){_resp_statu=200;_recv_statu=HttpRecvStatus::RECV_HTTP_LINE;_request.ReSet();}
+    void ReSet(){_resp_statu=200;_recv_statu=HttpRecvStatus::RECV_HTTP_LINE;_request.ReSet();_async_pending=false;}
     int RespStatu(){return _resp_statu;}
     HttpRecvStatus RecvStatu(){return _recv_statu;}
     HttpRequest& Request(){return _request;}
@@ -874,6 +878,7 @@ class HttpServer
         {
             //获取上下文
             HttpContext *context=conne->GetContext()->get<HttpContext>();
+            if (context->_async_pending) return;//异步handler执行中，暂不处理后续请求
             //通过上下文对接收缓冲区数据进行解析，得到httprequest对象
             context->RecvHttpRequest(buf);
              //L_DEBUG("解析后状态: %d, 响应码: %d", (int)context->RecvStatu(), context->RespStatu());
@@ -893,8 +898,14 @@ class HttpServer
             {//如果没有接收完毕，那么现在缓冲区的数据不是完整的，等下一次处理
                 return;
             }
+            //让handler能拿到连接，异步handler需要它来发回响应
+            resp._conne=conne;
             //请求路由和处理业务
             Route(req,&resp);
+            if(resp._deferred){//异步handler接管，稍后自己WriteResponse+ReSet
+                context->_async_pending=true;
+                return;
+            }
             //对httpresponse进行组织发送
             WriteResponse(conne,req,&resp);
             //重置上下文

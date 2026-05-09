@@ -1,5 +1,4 @@
 #include <hiredis/hiredis.h>
-#include <iostream>
 #include <string>
 #include <queue>
 #include <mutex>

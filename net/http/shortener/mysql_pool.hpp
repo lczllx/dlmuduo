@@ -1,25 +1,37 @@
 #include <mysql/mysql.h>
-#include <iostream>
 #include <string>
+#include <log_system/Logger.hpp>
 #include <queue>
 #include <unordered_map>
 #include <mutex>
 #include <condition_variable>
-// - `Init()`：预创建 N 个连接，任一失败返回 false
-// - `Acquire()`：阻塞等待直到有可用连接（用 `std::mutex` + `std::condition_variable`）
-// - `Release(MYSQL* conn)`：归还连接
-// - 析构函数：遍历关闭所有连接，`mysql_close`
+#include <thread>
+#include <functional>
+#include <atomic>
+
 class Mysql_Pool
 {
 public:
     using ptr = std::unique_ptr<Mysql_Pool>;
+    using AsyncCallback = std::function<void(MYSQL_RES*)>;
 
     Mysql_Pool(const std::string &host, const std::string &user,
-               const std::string &password, const std::string &db, int port, int pool_size)
+               const std::string &password, const std::string &db, int port, int pool_size,
+               int async_workers = 2)
         : _m_host(host), _m_user(user), _m_password(password), _m_db(db), _m_port(port),
-          _m_pool_size(pool_size) {}
+          _m_pool_size(pool_size), _async_workers(async_workers), _async_stop(false) {}
     ~Mysql_Pool()
     {
+        // 停止异步worker
+        {
+            std::lock_guard<std::mutex> lock(_async_mutex);
+            _async_stop = true;
+            _async_cond.notify_all();
+        }
+        for (auto &t : _async_threads) {
+            if (t.joinable()) t.join();
+        }
+        // 关闭同步连接池
         std::lock_guard<std::mutex> lock(_mutex);
         while (_mysqls.size())
         {
@@ -45,15 +57,35 @@ public:
             if (mysql_real_connect(conn, _m_host.c_str(), _m_user.c_str(),
                                    _m_password.c_str(), _m_db.c_str(), _m_port, nullptr, 0) == nullptr)
             {
+                L_ERROR("MySQL connect failed: %s (host=%s, port=%d)",
+                       mysql_error(conn), _m_host.c_str(), _m_port);
                 mysql_close(conn);
                 return false; // 连接失败
             }
             mysql_set_character_set(conn, "utf8mb4");
             _mysqls.push(conn);
         }
+
+        // 启动异步worker线程，每个持有自己的连接
+        for (int i = 0; i < _async_workers; ++i) {
+            MYSQL *conn = mysql_init(nullptr);
+            if (!conn) return false;
+            unsigned int timeout = 2;
+            mysql_options(conn, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
+            mysql_options(conn, MYSQL_OPT_READ_TIMEOUT, &timeout);
+            if (mysql_real_connect(conn, _m_host.c_str(), _m_user.c_str(),
+                                   _m_password.c_str(), _m_db.c_str(),
+                                   _m_port, nullptr, 0) == nullptr) {
+                L_ERROR("Async MySQL connect failed: %s", mysql_error(conn));
+                mysql_close(conn);
+                return false;
+            }
+            mysql_set_character_set(conn, "utf8mb4");
+            _async_threads.emplace_back(&Mysql_Pool::AsyncWorker, this, conn);
+        }
         return true;
     }
-    // 获取数据库连接
+    // 获取数据库连接（同步）
     MYSQL *Acquire()
     {
         MYSQL *mysql;
@@ -91,6 +123,16 @@ public:
         _m_cond_v.notify_one(); // 唤醒一个等待
     }
 
+    // 异步查询：sql在worker线程执行，callback在worker线程调用
+    void QueryAsync(const std::string &sql, AsyncCallback cb)
+    {
+        {
+            std::lock_guard<std::mutex> lock(_async_mutex);
+            _async_queue.emplace(sql, std::move(cb));
+        }
+        _async_cond.notify_one();
+    }
+
 private:
     std::mutex _mutex;
     std::queue<MYSQL *> _mysqls; // 数据库连接池
@@ -103,4 +145,56 @@ private:
     std::string _m_db;       // 数据库名称
     int _m_port;             // mysql端口
     int _m_pool_size;        // 连接池大小
+
+    // 异步查询
+    int _async_workers;
+    std::atomic<bool> _async_stop;
+    std::mutex _async_mutex;
+    std::condition_variable _async_cond;
+    std::queue<std::pair<std::string, AsyncCallback>> _async_queue;
+    std::vector<std::thread> _async_threads;
+
+    void AsyncWorker(MYSQL *conn)
+    {
+        while (!_async_stop) {
+            std::pair<std::string, AsyncCallback> task;
+            {
+                std::unique_lock<std::mutex> lock(_async_mutex);
+                _async_cond.wait(lock, [this] {
+                    return _async_stop || !_async_queue.empty();
+                });
+                if (_async_stop && _async_queue.empty()) break;
+                task = std::move(_async_queue.front());
+                _async_queue.pop();
+            }
+            const std::string &sql = task.first;
+            MYSQL_RES *result = nullptr;
+            // 心跳检测，连接断开则重连
+            if (conn && mysql_ping(conn) != 0) {
+                mysql_close(conn);
+                conn = mysql_init(nullptr);
+                if (conn) {
+                    unsigned int timeout = 2;
+                    mysql_options(conn, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
+                    mysql_options(conn, MYSQL_OPT_READ_TIMEOUT, &timeout);
+                    if (!mysql_real_connect(conn, _m_host.c_str(), _m_user.c_str(),
+                                           _m_password.c_str(), _m_db.c_str(),
+                                           _m_port, nullptr, 0)) {
+                        mysql_close(conn);
+                        conn = nullptr;
+                    } else {
+                        mysql_set_character_set(conn, "utf8mb4");
+                    }
+                }
+            }
+            if (conn && mysql_query(conn, sql.c_str()) == 0) {
+                result = mysql_store_result(conn);
+            } else if (!conn) {
+                L_ERROR("AsyncWorker: no valid MySQL connection");
+            }
+            task.second(result);//callback在worker线程执行
+            if (result) mysql_free_result(result);
+        }
+        mysql_close(conn);
+    }
 };

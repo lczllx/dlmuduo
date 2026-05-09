@@ -261,7 +261,7 @@ static const char kIndexHtml[] = R"raw(<!DOCTYPE html>
         <h1>ShortLink <span class="badge">C++11</span></h1>
         <span style="font-size: 0.7rem; background: #eef2ff; padding: 0.2rem 0.6rem; border-radius: 30px;">⚡ Reactor</span>
     </div>
-    <div class="sub">自研高性能网络库 · 毫秒级跳转</div>
+    <div class="sub">高性能网络库 · 毫秒级跳转</div>
 
     <div class="input-group">
         <label>🔗 长链接地址</label>

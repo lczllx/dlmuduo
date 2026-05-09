@@ -57,6 +57,7 @@ public:
 
     void SetContext(const Any &context) { _context = context; } // 设置上下文
     Any *GetContext() { return &_context; }                     // 获取上下文信息
+    EventLoop *GetLoop() const { return _loop; }                // 获取所属EventLoop
 
     // 设置回调接口
     void SetConnectedCallBack(const ConnectedCallBack &connected_cb) { _connected_cb = connected_cb; }
