@@ -727,10 +727,10 @@ class HttpServer
     //由于每次进行请求处理时都需要对正则表达式进行编译，为了更好的性能，可以设置成std::vector<std::pair<std::regex/*编译完毕的正则表达式*/,Handler>>
     using Route_Table=std::vector<std::pair<std::regex,Handler>>;//本来不想这样设置，但是不设置要改的太多了
     Route_Table _get_route;
-    // std::unordered_map<std::string, Handler> _get_exact_route;  // 压测用
     Route_Table _put_route;
     Route_Table _delete_route;
     Route_Table _post_route;
+    // std::unordered_map<std::string, Handler> _get_exact_route;  // 压测用
     std::string _basedir;//静态资源根目录
     TcpServer _server;
     private:
