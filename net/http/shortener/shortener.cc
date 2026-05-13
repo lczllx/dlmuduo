@@ -5,7 +5,7 @@
 void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
 {
     std::string long_url = req.GetParam("url");
-    L_INFO("ApiShorten called, url=%s", long_url.c_str());
+    LCZ_INFO("ApiShorten called, url=%s", long_url.c_str());
     if (long_url.empty()) {
         rsp->SetStatu(400);
         rsp->SetContent("url is required", "text/plain");
@@ -14,7 +14,7 @@ void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
 
     MYSQL* conn = g_mysql->Acquire();
     if (!conn) {
-        L_ERROR("Failed to acquire MySQL connection");
+        LCZ_ERROR("Failed to acquire MySQL connection");
         rsp->SetStatu(500);
         rsp->SetContent("Database Error", "text/plain");
         return;
@@ -30,7 +30,7 @@ void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
         getpid(), ++seq, escaped);
 
     if (mysql_query(conn, sql) != 0) {
-        L_ERROR("MySQL INSERT error: %s", mysql_error(conn));
+        LCZ_ERROR("MySQL INSERT error: %s", mysql_error(conn));
         g_mysql->Release(conn);
         rsp->SetStatu(500);
         rsp->SetContent("Database Error", "text/plain");
@@ -39,20 +39,20 @@ void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
 
     uint64_t id = mysql_insert_id(conn);
     std::string code = Base62::Encode(id);
-    L_INFO("INSERT success, id=%lu code=%s", id, code.c_str());
+    LCZ_INFO("INSERT success, id=%lu code=%s", id, code.c_str());
 
     mysql_real_escape_string(conn, escaped, code.c_str(), code.size());
     snprintf(sql, sizeof(sql),
         "UPDATE short_url SET code='%s' WHERE id=%lu", escaped, id);
 
     if (mysql_query(conn, sql) != 0) {
-        L_WARN("UPDATE code failed for id=%lu, error=%s", id, mysql_error(conn));
+        LCZ_WARN("UPDATE code failed for id=%lu, error=%s", id, mysql_error(conn));
     }
 
     g_mysql->Release(conn);
 
     if (!g_redis->Set(code, long_url)) {
-        L_WARN("Redis SET failed, code=%s", code.c_str());
+        LCZ_WARN("Redis SET failed, code=%s", code.c_str());
     }
 
     Json::Value resp;
@@ -60,7 +60,7 @@ void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
     resp["short_url"] = g_base_url + code;
     resp["long_url"]  = long_url;
 
-    L_INFO("ApiShorten done, code=%s", code.c_str());
+    LCZ_INFO("ApiShorten done, code=%s", code.c_str());
     rsp->SetContent(resp.toStyledString(), "application/json");
 }
 
@@ -69,7 +69,7 @@ void Redirect(const HttpRequest& req, HttpResponse* rsp)
     std::string code     = req._matches[1].str();
     std::string long_url = g_redis->Get(code);
 
-    L_DEBUG("Redirect code=%s, redis_hit=%d", code.c_str(), !long_url.empty());
+    LCZ_DEBUG("Redirect code=%s, redis_hit=%d", code.c_str(), !long_url.empty());
 
     if (!long_url.empty()) {
         rsp->SetRedirect(long_url, 302);
@@ -77,7 +77,7 @@ void Redirect(const HttpRequest& req, HttpResponse* rsp)
     }
 
     // Redis未命中，走异步MySQL回源
-    L_DEBUG("Redis miss, async MySQL for code=%s", code.c_str());
+    LCZ_DEBUG("Redis miss, async MySQL for code=%s", code.c_str());
 
     // short code 只含 [0-9A-Za-z]，不需要mysql_real_escape_string
     char sql[512];
@@ -95,9 +95,9 @@ void Redirect(const HttpRequest& req, HttpResponse* rsp)
             if (row && row[0]) {
                 long_url = row[0];
                 g_redis->Set(code, long_url);
-                L_DEBUG("MySQL found, code=%s url=%s", code.c_str(), long_url.c_str());
+                LCZ_DEBUG("MySQL found, code=%s url=%s", code.c_str(), long_url.c_str());
             } else {
-                L_DEBUG("MySQL not found, code=%s", code.c_str());
+                LCZ_DEBUG("MySQL not found, code=%s", code.c_str());
             }
         }
         // 回到I/O线程发送响应

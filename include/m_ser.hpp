@@ -15,5 +15,5 @@
 #include "LoopThread.hpp"
 #include "LoopThreadPool.hpp"
 #include "CallbackTypes.hpp"
-#include "Logger.hpp"
+#include "log_system/lcz_log.h"
 #endif

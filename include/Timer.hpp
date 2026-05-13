@@ -7,7 +7,7 @@
 #include <functional>
 #include <sys/timerfd.h>
 #include <unistd.h>
-#include "Logger.hpp"
+#include "log_system/lcz_log.h"
 #include "CallbackTypes.hpp"
 #include "Channel.hpp"
 
@@ -37,7 +37,7 @@ public:
         }
         catch (...)
         {
-            L_ERROR("TimerTask callback threw exception");
+            LCZ_ERROR("TimerTask callback threw exception");
         }
         if (_release_cb)
             _release_cb();
@@ -73,7 +73,7 @@ private:
         int timefd = timerfd_create(CLOCK_MONOTONIC, 0);//创建timerfd
         if (timefd < 0)
         {
-            L_ERROR("timerfd create failed");
+            LCZ_ERROR("timerfd create failed");
             abort();
         }
         struct itimerspec itime;
@@ -92,7 +92,7 @@ private:
         int ret = read(_timefd, &times, 8);
         if (ret < 0)
         {
-            L_ERROR("read timerfd failed");
+            LCZ_ERROR("read timerfd failed");
             abort();
         }
         return times; // 返回从上一次read之后超时的次数
@@ -130,7 +130,7 @@ private:
         // PtrTask pt=std::make_shared<TimerTask>(id, timeout, cb);
         if (delay == 0 || delay >= static_cast<uint32_t>(_capacity))
         {
-            L_ERROR("Invalid timer delay: %u (max: %d)", delay, (_capacity - 1));
+            LCZ_ERROR("Invalid timer delay: %u (max: %d)", delay, (_capacity - 1));
             return;
         }
         PtrTask pt(new TimerTask(id, delay, cb));
@@ -138,7 +138,7 @@ private:
         int pos = (delay + _tick) % _capacity;
         _wheel[pos].push_back(pt);
         _timers[id] = WeakTask(pt);
-        L_DEBUG("Added timer %lu to slot %d (delay %u)", id, pos, delay);
+        LCZ_DEBUG("Added timer %lu to slot %d (delay %u)", id, pos, delay);
     }
     
     void TimerRefleshInLoop(uint64_t id)

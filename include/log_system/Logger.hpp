@@ -551,6 +551,10 @@ public:
         _limit_level.store(level);
     }
 
+    LogLevel::value level() const {
+        return _limit_level.load();
+    }
+
     void Debug(const std::string& file, size_t line, const std::string& fmt, ...)
     {
         if (LogLevel::value::DEBUG < _limit_level.load()) return;

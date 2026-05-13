@@ -1,5 +1,5 @@
 #include "../include/TcpServer.hpp"
-#include "../include/Logger.hpp"
+#include "../include/log_system/lcz_log.h"
 #include <iostream>
 #include <sys/resource.h>
 class EchoServer
@@ -8,11 +8,11 @@ class EchoServer
     TcpServer _server;
     void OnConnected(const PtrConnection&conne)
     {
-        L_DEBUG("new connected %p", conne.get());
+        LCZ_DEBUG("new connected %p", conne.get());
     }
     void OnClosed(const PtrConnection&conne)
     {
-        L_DEBUG("close connected %p", conne.get());
+        LCZ_DEBUG("close connected %p", conne.get());
     }
     void OnMessage(const PtrConnection&conne,Buffer *buf)
     {

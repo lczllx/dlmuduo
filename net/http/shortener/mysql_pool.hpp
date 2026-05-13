@@ -1,6 +1,6 @@
 #include <mysql/mysql.h>
 #include <string>
-#include <log_system/Logger.hpp>
+#include <log_system/lcz_log.h>
 #include <queue>
 #include <unordered_map>
 #include <mutex>
@@ -57,7 +57,7 @@ public:
             if (mysql_real_connect(conn, _m_host.c_str(), _m_user.c_str(),
                                    _m_password.c_str(), _m_db.c_str(), _m_port, nullptr, 0) == nullptr)
             {
-                L_ERROR("MySQL connect failed: %s (host=%s, port=%d)",
+                LCZ_ERROR("MySQL connect failed: %s (host=%s, port=%d)",
                        mysql_error(conn), _m_host.c_str(), _m_port);
                 mysql_close(conn);
                 return false; // 连接失败
@@ -76,7 +76,7 @@ public:
             if (mysql_real_connect(conn, _m_host.c_str(), _m_user.c_str(),
                                    _m_password.c_str(), _m_db.c_str(),
                                    _m_port, nullptr, 0) == nullptr) {
-                L_ERROR("Async MySQL connect failed: %s", mysql_error(conn));
+                LCZ_ERROR("Async MySQL connect failed: %s", mysql_error(conn));
                 mysql_close(conn);
                 return false;
             }
@@ -190,7 +190,7 @@ private:
             if (conn && mysql_query(conn, sql.c_str()) == 0) {
                 result = mysql_store_result(conn);
             } else if (!conn) {
-                L_ERROR("AsyncWorker: no valid MySQL connection");
+                LCZ_ERROR("AsyncWorker: no valid MySQL connection");
             }
             task.second(result);//callback在worker线程执行
             if (result) mysql_free_result(result);

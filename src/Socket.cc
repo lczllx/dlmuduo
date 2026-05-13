@@ -1,4 +1,5 @@
 #include "../include/Socket.hpp"
+#include "../include/log_system/lcz_log.h"
 #include <cstring>
 #include <cerrno>
 
@@ -10,7 +11,7 @@ bool Socket::Create() {
     //socket（地址类型，套接字类型，协议类型）
     _sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(_sockfd < 0) {
-        L_ERROR("create socket failed");
+        LCZ_ERROR("create socket failed");
         return false;
     }
     return true;
@@ -24,7 +25,7 @@ bool Socket::Bind(const std::string &ip, uint16_t port) {
     socklen_t len = sizeof(struct sockaddr_in);
     int ret = bind(_sockfd, (struct sockaddr*)&addr, len);
     if(ret < 0) {
-        L_ERROR("socket bind failed");
+        LCZ_ERROR("socket bind failed");
         return false;
     }
     return true;
@@ -37,7 +38,7 @@ bool Socket::Listen(int backlog)
     int ret=listen(_sockfd,backlog);
     if(ret<0)
     {
-        L_ERROR("socket listen failed");
+        LCZ_ERROR("socket listen failed");
         return false;
     }
     return true;
@@ -55,7 +56,7 @@ bool Socket::Connect(const std::string &ip,uint16_t port)
     int ret=connect(_sockfd,(struct sockaddr*)&addr,len);
     if(ret<0)
     {
-        L_ERROR("socket connect failed");
+        LCZ_ERROR("socket connect failed");
         return false;
     }
     return true;
@@ -70,7 +71,7 @@ int Socket::Accept()//可以使用 sockaddr_storage，避免 IPv4/IPv6 不兼容
     if(newfd<0)
     {
         int e = errno;
-        L_ERROR("socket Accept failed errno=%d (%s)", e, strerror(e));
+        LCZ_ERROR("socket Accept failed errno=%d (%s)", e, strerror(e));
         return -1;
     }
     return newfd;
@@ -85,7 +86,7 @@ ssize_t Socket::Recv(void *buf,size_t len,int flag)
         if(ret==0) return -1;  // 对端正常关闭，不打印错误
         // ret<0: EAGAIN/EINTR 为可忽略，其他为真错误
         if(errno==EAGAIN||errno==EINTR) return 0;
-        L_ERROR("socket Recv failed errno=%d (%s)", errno, strerror(errno));
+        LCZ_ERROR("socket Recv failed errno=%d (%s)", errno, strerror(errno));
         return -1;
     }
     return ret;
@@ -106,7 +107,7 @@ ssize_t Socket::Send(const void *buf,size_t len,int flag)
         {
             return 0;
         }
-        L_ERROR("socket Send failed");
+        LCZ_ERROR("socket Send failed");
         return -1;
     }
     return ret;//实际发送的数据长度
@@ -153,11 +154,11 @@ void Socket::NoBlock()// 设置套接字为非阻塞模式
 {
     int flag = fcntl(_sockfd, F_GETFL, 0);//获取套接字属性
     if (flag == -1) {
-        L_ERROR("fcntl F_GETFL failed: %s", strerror(errno));
+        LCZ_ERROR("fcntl F_GETFL failed: %s", strerror(errno));
         return;
     }
     // 设置套接字为非阻塞模式
     if (fcntl(_sockfd, F_SETFL, flag | O_NONBLOCK) == -1) {
-        L_ERROR("fcntl F_SETFL failed: %s", strerror(errno));
+        LCZ_ERROR("fcntl F_SETFL failed: %s", strerror(errno));
     }
 }

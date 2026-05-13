@@ -45,7 +45,7 @@ namespace lcz
         }
         void stop()
         {         
-             _stop = true;
+            _stop = true;
             _cond_con.notify_all();//唤醒所有工作线程
             _cond_pro.notify_all();
             if (_thread.joinable()) {
@@ -85,7 +85,9 @@ namespace lcz
                     {
                         _cond_pro.notify_all();
                     }
-                    //被唤醒后对数据进行处理
+                    lock.unlock(); 
+                } 
+                 //被唤醒后对数据进行处理
                     _callback(_con_buf);
 
                     // // 检查是否需要同步
@@ -97,8 +99,7 @@ namespace lcz
                     // }
 
                     //初始化缓冲区
-                    _con_buf.reset();
-                }        
+                    _con_buf.reset();       
                 // if (!local_buf.empty()) 
                 // {
                 //     _callback(_con_buf);

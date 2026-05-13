@@ -72,10 +72,19 @@ public:
 
 }  // namespace muduo
 
-#define L_DEBUG muduo::Logger(muduo::DEBUG, __FILE__, __LINE__)
-#define L_INFO  muduo::Logger(muduo::INFO, __FILE__, __LINE__)
-#define L_WARN  muduo::Logger(muduo::WARN, __FILE__, __LINE__)
-#define L_ERROR muduo::Logger(muduo::ERROR, __FILE__, __LINE__)
+// 级别检查前置：避免被抑制的日志调用仍付出 snprintf + 临时对象构造开销
+#define L_DEBUG \
+    if (lcz::LogLevel::value::DEBUG < lcz::LoggerManager::getInstance().rootLogger()->level()) {} \
+    else muduo::Logger(muduo::DEBUG, __FILE__, __LINE__)
+#define L_INFO  \
+    if (lcz::LogLevel::value::INFO  < lcz::LoggerManager::getInstance().rootLogger()->level()) {} \
+    else muduo::Logger(muduo::INFO,  __FILE__, __LINE__)
+#define L_WARN  \
+    if (lcz::LogLevel::value::WARN  < lcz::LoggerManager::getInstance().rootLogger()->level()) {} \
+    else muduo::Logger(muduo::WARN,  __FILE__, __LINE__)
+#define L_ERROR \
+    if (lcz::LogLevel::value::ERROR < lcz::LoggerManager::getInstance().rootLogger()->level()) {} \
+    else muduo::Logger(muduo::ERROR, __FILE__, __LINE__)
 #define L_FATAL muduo::Logger(muduo::FATAL, __FILE__, __LINE__)
 
 #endif

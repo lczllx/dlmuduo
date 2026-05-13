@@ -1,5 +1,5 @@
 #include "../include/Buffer.hpp"
-#include "../include/Logger.hpp"
+#include "../include/log_system/lcz_log.h"
 
 Buffer::Buffer() : _read_idx(0), _write_idx(0), _buffer(BUFFER_DEFAULT_SIZE) {}
 
@@ -34,7 +34,7 @@ void Buffer::EnsureWritableBytes(uint64_t len)
     }
     else
     {
-        L_DEBUG("RESIZE %lu", (_write_idx + len));
+        LCZ_DEBUG("RESIZE %lu", (_write_idx + len));
         _buffer.resize(_write_idx + len);//空间不够就扩容
     }
 }

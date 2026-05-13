@@ -1,6 +1,6 @@
 #include "../include/Connection.hpp"
 #include "../include/EventLoop.hpp"
-#include "../include/Logger.hpp"
+#include "../include/log_system/lcz_log.h"
 #include <cstring>
 #include <cerrno>
 
@@ -17,7 +17,7 @@ Connection::Connection(EventLoop *loop, uint64_t cone_id, int sockfd)
 
 Connection::~Connection()
 {
-    L_DEBUG("release %p", this);
+    LCZ_DEBUG("release %p", this);
 }
 
 void Connection::HandleRead()

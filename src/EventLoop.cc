@@ -1,5 +1,6 @@
 #include "../include/EventLoop.hpp"
 #include "../include/Channel.hpp"
+#include "../include/log_system/lcz_log.h"
 #include <cstring>
 #include <cerrno>
 
@@ -40,7 +41,7 @@ int EventLoop::CreateEventfd() {
     //EFD_CLOEXEC禁止进程复制 EFD_NONBLOCK启动非阻塞
     int efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     if(efd < 0) {
-        L_ERROR("create eventfd failed");
+        LCZ_ERROR("create eventfd failed");
         abort();
     }
     return efd;
@@ -51,7 +52,7 @@ void EventLoop::ReadEventfd() {
     int ret = read(_eventfd, &res, sizeof(res));
     if(ret < 0) {
         if(errno == EINTR || errno == EAGAIN) return;
-        L_ERROR("read eventfd failed");
+        LCZ_ERROR("read eventfd failed");
         abort();
     }
 }
@@ -61,7 +62,7 @@ void EventLoop::WeakupEventfd() {
     int ret = write(_eventfd, &val, sizeof(val));//写入触发可读事件
     if(ret < 0) {
         if(errno == EINTR) return;
-        L_ERROR("write eventfd failed");
+        LCZ_ERROR("write eventfd failed");
         abort();
     }
 }

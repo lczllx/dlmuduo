@@ -181,7 +181,7 @@ class Util
         std::ifstream ifs(filename,std::ios::binary);
         if(!ifs.is_open())
         {
-            L_ERROR("open %s file failed", filename.c_str());
+            LCZ_ERROR("open %s file failed", filename.c_str());
             return false;
         }
         size_t fsize=0;
@@ -189,7 +189,7 @@ class Util
         fsize=ifs.tellg();
         if (fsize <= 0)
         {
-            L_ERROR("file %s is empty or size error", filename.c_str());
+            LCZ_ERROR("file %s is empty or size error", filename.c_str());
             ifs.close();
             return false;
         }
@@ -198,7 +198,7 @@ class Util
        ifs.read(&(*buf)[0], fsize);
         if (ifs.good()==false)
         {
-            L_ERROR("read %s file failed", filename.c_str());
+            LCZ_ERROR("read %s file failed", filename.c_str());
             ifs.close();
             return false;
         }
@@ -211,13 +211,13 @@ class Util
         std::ofstream ofs(filename,std::ios::binary | std::ios::trunc);// 以二进制模式打开文件，trunc表示清空原有内容
         if(!ofs.is_open())
         {
-            L_ERROR("open %s file failed", filename.c_str());
+            LCZ_ERROR("open %s file failed", filename.c_str());
             return false;
         }
         ofs.write(buf.c_str(),buf.size());
         if(!ofs.good())
         {
-            L_ERROR("write %s file failed", filename.c_str());
+            LCZ_ERROR("write %s file failed", filename.c_str());
             ofs.close();
             return false;
         }
@@ -543,7 +543,7 @@ class HttpContext
      // 解析请求行，格式如："GET /path?query HTTP/1.1"
     bool ParseHttpLine(const std::string &line)
     {    
-         //L_DEBUG("开始解析请求行: [%s]", line.c_str());
+         //LCZ_DEBUG("开始解析请求行: [%s]", line.c_str());
         std::smatch matchs;
         //正则表达式匹配请求方法、路径、查询字符串及协议版本（静态仅编译一次）
         static const std::regex e(
@@ -553,7 +553,7 @@ class HttpContext
         //std::regex e("^(GET|HEAD|POST|PUT|DELETE|OPTIONS|PATCH)\\s+([^\\s?]+)(?:\\?(.*))?\\s+(HTTP/1\\.[01])", std::regex::icase);
         bool ret = std::regex_match(line, matchs, e);
         if(!ret){// 解析失败，设置错误状态和响应码
-             // L_DEBUG("请求行解析失败: %s", line.c_str()); 
+             // LCZ_DEBUG("请求行解析失败: %s", line.c_str()); 
             _recv_statu=HttpRecvStatus::RECV_HTTP_ERROR;
             _resp_statu=400;//Bad request
             return false;
@@ -701,7 +701,7 @@ class HttpContext
     //接收并解析http请求
     void RecvHttpRequest(Buffer *buf)
     {
-        //L_DEBUG("开始解析HTTP请求,当前状态: %d", (int)_recv_statu);
+        //LCZ_DEBUG("开始解析HTTP请求,当前状态: %d", (int)_recv_statu);
         switch(_recv_statu)
         {
             case HttpRecvStatus::RECV_HTTP_LINE:RecvHttpLine(buf);
@@ -714,7 +714,7 @@ class HttpContext
             case HttpRecvStatus::RECV_HTTP_OVER:
                 break;
         }
-         //L_DEBUG("解析完成，新状态: %d", (int)_recv_statu);
+         //LCZ_DEBUG("解析完成，新状态: %d", (int)_recv_statu);
         return;
     }
 };
@@ -870,7 +870,7 @@ class HttpServer
         return;
     }
     //设置上下文
-    void OnConnected(const PtrConnection &conne){conne->SetContext(HttpContext());L_DEBUG("newconnection %p", conne.get());}
+    void OnConnected(const PtrConnection &conne){conne->SetContext(HttpContext());LCZ_DEBUG("newconnection %p", conne.get());}
     //缓冲区数据解析处理
     void OnMessage(const PtrConnection &conne,Buffer *buf)
     {
@@ -881,12 +881,12 @@ class HttpServer
             if (context->_async_pending) return;//异步handler执行中，暂不处理后续请求
             //通过上下文对接收缓冲区数据进行解析，得到httprequest对象
             context->RecvHttpRequest(buf);
-             //L_DEBUG("解析后状态: %d, 响应码: %d", (int)context->RecvStatu(), context->RespStatu());
+             //LCZ_DEBUG("解析后状态: %d, 响应码: %d", (int)context->RecvStatu(), context->RespStatu());
             HttpResponse resp(context->RespStatu());//根据响应状态码构建resp
             HttpRequest &req=context->Request();
             if(context->RespStatu()>=400)//---这里出错了，感觉是这里的问题
             {
-                L_DEBUG("检测到错误，关闭连接。状态: %d", (int)context->RecvStatu());
+                LCZ_DEBUG("检测到错误，关闭连接。状态: %d", (int)context->RecvStatu());
                 ErrorHandler(req,&resp);//填充一个错误页面给resp
                 WriteResponse(conne,req,&resp);//组织发送给客户端
                 context->ReSet();//-
@@ -928,7 +928,7 @@ class HttpServer
     void Delete(const std::string &pattern,const Handler &handler){ _delete_route.push_back(std::make_pair(std::regex(pattern),handler));}
     void SetBasedir(const std::string &path){
         if (!Util::IsDirectory(path)) {
-            L_ERROR("SetBasedir failed: %s is not a directory", path.c_str());
+            LCZ_ERROR("SetBasedir failed: %s is not a directory", path.c_str());
             abort();
         }
         _basedir=path;

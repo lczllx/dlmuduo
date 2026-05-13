@@ -1,6 +1,6 @@
 #include "shortener.hpp"
 #include "index_html.hpp"
-#include <log_system/Logger.hpp>
+#include <log_system/lcz_log.h>
 #include <cstdlib>
 
 std::unique_ptr<Redis_Client> g_redis;
@@ -39,20 +39,20 @@ int main()
 
     g_mysql.reset(new Mysql_Pool(mysql_host, mysql_user, mysql_pass, mysql_db, mysql_port, mysql_pool));
     if (!g_mysql->Init()) {
-        L_ERROR("MySQL init failed");
+        LCZ_ERROR("MySQL init failed");
         return 1;
     }
-    L_INFO("MySQL init OK");
+    LCZ_INFO("MySQL init OK");
 
     const char* redis_host = env("REDIS_HOST", "127.0.0.1");
     int redis_port = safe_stoi(env("REDIS_PORT", "6379"), 6379);
 
     g_redis.reset(new Redis_Client());
     if (!g_redis->Connect(redis_host, redis_port)) {
-        L_ERROR("Redis connect failed");
+        LCZ_ERROR("Redis connect failed");
         return 1;
     }
-    L_INFO("Redis connect OK");
+    LCZ_INFO("Redis connect OK");
 
     const char* base_url = std::getenv("BASE_URL");
     if (base_url && base_url[0]) g_base_url = base_url;
@@ -64,7 +64,7 @@ int main()
     server.Get("/health", HealthCheck);
     server.Post("/api/shorten", ApiShorten);
     server.Get("/([A-Za-z0-9]+)", Redirect);
-    L_INFO("Short URL server starting on :%d", port);
+    LCZ_INFO("Short URL server starting on :%d", port);
     server.Listen();
 
     return 0;
