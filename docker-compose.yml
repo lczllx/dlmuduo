@@ -1,4 +1,4 @@
-version: "3.8"
+version: "2.4"
 
 services:
   mysql:
@@ -13,9 +13,10 @@ services:
       - ./net/http/shortener/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pshortener"]
-      interval: 3s
-      timeout: 3s
-      retries: 10
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
     restart: unless-stopped
 
   redis:
@@ -23,8 +24,8 @@ services:
     container_name: shortener-redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 3s
-      timeout: 3s
+      interval: 5s
+      timeout: 5s
       retries: 10
     restart: unless-stopped
 
