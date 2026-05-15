@@ -41,7 +41,7 @@ logfile/
 # 测试文件
 test_output/
 performance_test/
-net/http/wwwroot/
+
 
 # 文档和示例目录
 docs/
