@@ -14,7 +14,7 @@ class Poller
 {
 private:
     int _epfd;
-    struct epoll_event _evs[MAX_EPOLLEVENTS];//
+    std::vector<struct epoll_event> _evs;//
     std::unordered_map<int, Channel *> _channels;//管理描述符和对应的channel
 
     void Update(Channel *channel, int op);//根据具体操作类型更新epoll

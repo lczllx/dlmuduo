@@ -6,7 +6,7 @@
 #include <cerrno>
 #include <unistd.h>
 
-Poller::Poller()
+Poller::Poller() : _evs(MAX_EPOLLEVENTS)
 {
     _epfd = epoll_create(MAX_EPOLLEVENTS);
     if (_epfd < 0)
@@ -65,7 +65,7 @@ void Poller::RemoveEvent(Channel *channel)
 void Poller::Poll(std::vector<Channel *> *active)
 {
     // int epoll_wait(int epfd,struct epoll_even *evs,int maxevents,int timeout)
-    int nfds = epoll_wait(_epfd, _evs, MAX_EPOLLEVENTS, -1); //-1为阻塞监控
+    int nfds = epoll_wait(_epfd, _evs.data(), MAX_EPOLLEVENTS, -1); //-1为阻塞监控
     if (nfds < 0)
     {
         // EINTR 阻塞被信号打断了
