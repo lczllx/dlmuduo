@@ -15,8 +15,11 @@ EventLoop::EventLoop() :
     _event_channel->EnableRead();
 }
 
+// 主循环：epoll_wait → 处理 IO 事件 → 执行任务队列
+// Stop() 将 _running 设为 false 并 wakeup eventfd 后，循环退出
 void EventLoop::Start() {
-    while(true) {
+    _running = true;
+    while(_running) {
         std::vector<Channel*> actives;
         _poller.Poll(&actives);
         for(auto &e : actives) {
@@ -24,8 +27,16 @@ void EventLoop::Start() {
         }
         RunAllTask();//执行任务池任务
     }
+    // 退出前排空任务队列：Stop() 或 Release() 可能通过 TasksInLoop 投递了清理任务
+    RunAllTask();
 }
 
+void EventLoop::Stop() {
+    _running = false;
+    WeakupEventfd();// 唤醒可能因无事件而阻塞在 epoll_wait 的 Start()
+}
+
+// swap 到栈上再执行：减小临界区（只持有锁做 swap），避免在执行回调时持有锁导致死锁
 void EventLoop::RunAllTask() {
     std::vector<Tasks> tmp;
     {
@@ -33,7 +44,7 @@ void EventLoop::RunAllTask() {
         _task.swap(tmp);
     }
     for(auto &task : tmp) {
-        task();//执行任务
+        task();
     }
 }
 

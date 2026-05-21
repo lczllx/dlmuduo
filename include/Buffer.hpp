@@ -12,9 +12,9 @@
 /*用户态缓冲区，对接收发送的数据进行缓冲 */
 class Buffer {
 private:
-    uint64_t _read_idx;//相对写偏移
-    uint64_t _write_idx;//相对读偏移
-    std::vector<char> _buffer;//连续空间
+    uint64_t _read_idx;//读偏移，指向可读数据的起始位置
+    uint64_t _write_idx;//写偏移，指向可写空间的起始位置
+    std::vector<char> _buffer;//连续空间，初始大小 BUFFER_DEFAULT_SIZE(1024)
 
 public:
     Buffer();
@@ -44,7 +44,7 @@ public:
     char* FindcrLf();//寻找换行字符
     std::string GetLine();//获取一行
     std::string GetLineAndPop();//获取一行并移动读偏移
-    void clear();//重置缓冲区状态
+    void clear();//重置读写偏移为0，不释放已分配内存
 };
 
 #endif

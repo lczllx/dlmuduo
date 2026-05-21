@@ -15,7 +15,7 @@ class Connection : public std::enable_shared_from_this<Connection> //
 {
 private:
     uint64_t _conne_id;            // 连接唯一id
-    uint64_t _timer_id;            // 定时器唯一id，这里使用_conne_id，可以自行生成
+    uint64_t _timer_id;            // 定时器唯一id，直接用 _conne_id（每个连接只有一个超时任务）
     int _sockfd;                   // 连接套接字描述符
     bool _enable_inactive_release; // 是否启动非活跃连接销毁
     EventLoop *_loop;              // 连接关联的eventloop
@@ -24,13 +24,13 @@ private:
     Channel _conne_channel;
     Buffer _in_buffer;  // 输入缓冲区
     Buffer _out_buffer; // 输出缓冲区
-    Any _context;       // 协议上下文管理
+    Any _context;       // 协议上下文，Upgrade() 切换协议时替换
 
     ConnectedCallBack _connected_cb;  // 连接建立成功回调
     ClosedCallBack _closed_cb;        // 连接关闭回调
     MessageCallBack _message_cb;      // 有新数据接收成功的回调
     AnyEventCallBack _event_cb;       // 任意事件回调
-    ClosedCallBack _server_closed_cb; //组件内的连接关闭回调
+    ClosedCallBack _server_closed_cb; //TcpServer 内部回调，用于从 _connections map 移除连接
 
     void HandleRead();//描述符触发可读
     void HandleWrite();//描述符触发可写
@@ -67,11 +67,12 @@ public:
     void SetServerClosedCallBack(const ClosedCallBack &cb) { _server_closed_cb = cb; }
 
     void Established();                                                                                                                                                            // 连接获取后，所处的状态进行各种设置-设置事件回调，启动读监控，调用连接建立完成的回调
-    void Send(const char *data, size_t len);                                                                                                                                       // 发送数据-数据放到发送缓冲区
+    void Send(const char *data, size_t len);//将 data 拷贝到输出缓冲区并启动写事件监控，实际发送在 HandleWrite 异步完成
     void EnableInactiveRelease(int sec);                                                                                                                                           // 启动非活跃销毁
     void CancelInactiveRelease();                                                                                                                                                  // 取消非活跃销毁
     void Shutdown();                                                                                                                                                               // 提供给使用者的关闭接口
     void Release();                                                                                                                                                                // 释放接口
-    void Upgrade(const Any &context, const ConnectedCallBack &connected_cb, const ClosedCallBack &closed_cb, const MessageCallBack &message_cb, const AnyEventCallBack &event_cb); // 切换协议
+    // 协议切换：原子替换所有回调函数 + 上下文对象，用于 HTTP → WebSocket 等场景
+    void Upgrade(const Any &context, const ConnectedCallBack &connected_cb, const ClosedCallBack &closed_cb, const MessageCallBack &message_cb, const AnyEventCallBack &event_cb);
 };
 #endif

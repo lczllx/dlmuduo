@@ -46,15 +46,20 @@ public:
     uint32_t DelayTime() { return _timeout; }
     void Cancel() { _cancel = true; } // 添加取消接口
 };
+/*时间轮定时器：360 个槽，每槽 1 秒，O(1) 插入/删除
+  原理：timerfd 每秒触发一次 → OnTime() → RunTimerTask()
+  RunTimerTask() 清空当前槽 → shared_ptr 析构触发定时任务回调
+  索引：_timers 用 weak_ptr，不阻止 TimerTask 析构，_wheel 用 shared_ptr 持有所有权
+  线程安全：所有公开接口通过 RunInLoop 路由到 EventLoop 线程*/
 class TimingWheel
 {
 private:
     using PtrTask = std::shared_ptr<TimerTask>;
     using WeakTask = std::weak_ptr<TimerTask>;
-    int _tick;     // 秒针
-    int _capacity; // 时间轮的大小
-    std::vector<std::vector<PtrTask>> _wheel;
-    std::unordered_map<uint64_t, WeakTask> _timers;
+    int _tick;     // 当前槽位索引，每 tick 前进 1，模 _capacity 回绕
+    int _capacity; // 时间轮槽数 = 360，最大延迟 359 秒
+    std::vector<std::vector<PtrTask>> _wheel; // 环形槽数组，每个槽存储 shared_ptr<TimerTask>
+    std::unordered_map<uint64_t, WeakTask> _timers; // id→weak_ptr 索引，不阻止槽清空时析构
 
     EventLoop *_loop;
     int _timefd; // 定时器描述符 可读事件回调就是读取计数器，执行定时任务
@@ -68,6 +73,7 @@ private:
         _timers.erase(it);
     }
 
+    // timerfd 每秒触发一次可读事件，OnTime() 读取超时次数后补齐执行
     static int CreateTimerfd()
     {
         int timefd = timerfd_create(CLOCK_MONOTONIC, 0);//创建timerfd
@@ -98,7 +104,9 @@ private:
         return times; // 返回从上一次read之后超时的次数
     }
 
-    void RunTimerTask() //*
+    // 清空当前槽 → shared_ptr 析构 → TimerTask::~TimerTask() 执行回调 → ReleaseFunc 从 _timers 移除 weak_ptr
+    // 依赖 RAII：槽是 shared_ptr 的唯一持有者，clear() 后引用计数归零
+    void RunTimerTask()
     {
         //版本1
         // _tick=(_tick+1)%_capacity;
@@ -125,6 +133,7 @@ private:
         }
     }
 
+    // 计算目标槽位 = (当前_tick + 延迟) % _capacity，将 TimerTask 挂入对应槽
     void TimerAddInLoop(uint64_t id, uint32_t delay, const TaskFunc &cb)
     {
         // PtrTask pt=std::make_shared<TimerTask>(id, timeout, cb);
@@ -141,6 +150,7 @@ private:
         LCZ_DEBUG("Added timer %lu to slot %d (delay %u)", id, pos, delay);
     }
     
+    // refresh：重新插入到新的目标槽位，延长定时器生命周期
     void TimerRefleshInLoop(uint64_t id)
     {
         auto it = _timers.find(id);

@@ -37,7 +37,7 @@ public:
     bool CreateServer(uint16_t port, const std::string &ip = "0.0.0.0", bool block_flag = false);
     //创建客户端连接
     bool CreateClient(uint16_t port, const std::string &ip);
-    void ReuseAdderess();//开启地址端口重用 防止缓冲区没有数据时阻塞
+    void ReuseAdderess();//设置地址重用，允许快速重启时绑定仍处于 TIME_WAIT 的端口
     void NoBlock();//设置套接字为非阻塞
 };
 

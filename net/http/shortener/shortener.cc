@@ -24,6 +24,8 @@ void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
     char sql[16384];
     mysql_real_escape_string(conn, escaped, long_url.c_str(), long_url.size());
 
+    // 两步写入：先 INSERT 占位拿到自增 ID，用 ID 生成 short code，再 UPDATE 回写
+    // TMP_ 前缀：占位值，避免 code 列唯一约束冲突；用 pid+seq 保证不同进程不碰撞
     static std::atomic<long> seq{0};
     snprintf(sql, sizeof(sql),
         "INSERT INTO short_url (code, long_url) VALUES ('TMP_%d_%ld', '%s')",
@@ -38,7 +40,7 @@ void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
     }
 
     uint64_t id = mysql_insert_id(conn);
-    std::string code = Base62::Encode(id);
+    std::string code = Base62::Encode(id);  // 用自增 ID 做 Base62 编码得到短码
     LCZ_INFO("INSERT success, id=%lu code=%s", id, code.c_str());
 
     mysql_real_escape_string(conn, escaped, code.c_str(), code.size());
@@ -84,8 +86,12 @@ void Redirect(const HttpRequest& req, HttpResponse* rsp)
     snprintf(sql, sizeof(sql),
         "SELECT long_url FROM short_url WHERE code='%s' LIMIT 1", code.c_str());
 
+    // 跨线程异步流程（3 个线程参与）：
+    // 1. I/O 线程：设 _deferred=true，持有 _conne，投递 SQL 任务到 MySQL worker
+    // 2. MySQL worker 线程：执行查询，拿到结果后通过 RunInLoop 回调 I/O 线程
+    // 3. I/O 线程：构造 HTTP 响应，Send 数据，ReSet 上下文
     rsp->_deferred = true;
-    PtrConnection conne = rsp->_conne;
+    PtrConnection conne = rsp->_conne;  // shared_ptr 保证异步回调时连接仍存活
     bool is_close = req.IsClose();
 
     g_mysql->QueryAsync(sql, [conne, is_close, code = std::move(code)](MYSQL_RES* result) {
@@ -100,7 +106,7 @@ void Redirect(const HttpRequest& req, HttpResponse* rsp)
                 LCZ_DEBUG("MySQL not found, code=%s", code.c_str());
             }
         }
-        // 回到I/O线程发送响应
+        // 回到I/O线程发送响应（RunInLoop 跨线程投递）
         conne->GetLoop()->RunInLoop([conne, long_url, is_close]() {
             HttpContext* ctx = conne->GetContext()->get<HttpContext>();
             HttpRequest& req = ctx->Request();

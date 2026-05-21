@@ -20,6 +20,7 @@ public:
     void SetThreadCnt(int cnt);//设置线程数量
     void Create();//创建所有从属线程
     EventLoop* NextLoop();//采用rr轮转分配线程
+    void Stop();//停止所有从属线程
 };
 
 #endif

@@ -124,6 +124,7 @@ public:
     }
 
     // 异步查询：sql在worker线程执行，callback在worker线程调用
+    // 注意：cb 不在 I/O 线程执行，需要 RunInLoop 才能安全操作 Connection
     void QueryAsync(const std::string &sql, AsyncCallback cb)
     {
         {

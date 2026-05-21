@@ -7,6 +7,76 @@
 **编译器**：g++  
 **编程语言**：C++
 
+## 测试环境
+
+| 项目 | 规格 |
+|------|------|
+| 云服务器 | 4C8G 5Mbps |
+| 操作系统 | Ubuntu 22.04.5 LTS |
+| 编译器 | g++ 12.3.0 |
+| 构建工具 | CMake 3.22.1 |
+
+## 如何复现
+
+```bash
+git clone https://github.com/lczllx/muduo.git
+cd muduo
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+../bin/test              # Echo 服务
+../bin/http_server       # HTTP 服务（/hello 等路由）
+../bin/shortener_server  # 短链接服务（需 MySQL + Redis）
+```
+
+短链接服务依赖 MySQL 和 Redis，可通过环境变量配置：
+
+```bash
+export MYSQL_HOST=127.0.0.1 MYSQL_PORT=3306 MYSQL_USER=root MYSQL_PASS=shortener MYSQL_DB=shortener
+export REDIS_HOST=127.0.0.1 REDIS_PORT=6379
+../bin/shortener_server
+```
+
+Docker（仓库根目录 `Dockerfile`，Alpine 3.19 多阶段构建）：
+
+```bash
+docker build -t lcz-muduo .
+docker run -p 8080:8080 lcz-muduo
+```
+
+压测复现（需要 `wrk`）：
+
+```bash
+./scripts/bench/run_qps_wrk.sh            # keep-alive 基准 QPS
+./scripts/bench/run_qps_wrk.sh --100k      # 十万长连接 QPS
+```
+
+## 代码统计
+
+| 项目 | 数值 |
+|------|------|
+| 总行数 | 7,186 |
+| 自己写的行数 | 5,571（不含空行/注释） |
+| 核心库 (src+include) | 3,867 行 |
+| HTTP+Shortener (net/) | 2,229 行 |
+| 源文件数 | 45 |
+| 单元测试 | 无（仅 `example/test.cc` 和 `concurrent_test.cc` 两个手工测试，共 299 行） |
+| 测试覆盖率 | ~0% |
+
+## 已知缺陷
+
+- **无单元测试**：未引入 GTest，正确性仅靠手工 echo/HTTP 示例验证，回归依赖人工。
+- **MySQL 同步阻塞 I/O 线程**：Shortener 的 shorten 和 redirect 两条路径中，Redis miss 回源均走 `mysql_query()` 同步调用（单次 0.5–2ms），阻塞 Reactor I/O 线程，长尾延迟恶化。
+- **Redis Acquire() 阻塞 I/O 线程**：池满时 `Acquire()` 的 `_cond.wait()` 无超时，永久阻塞持锁的 Reactor I/O 线程；且池内连接断开后的 `redisReconnect()` / `redisConnect()` 是同步调用，可能阻塞数百毫秒。
+- **TMP_ 占位垃圾残留**：两步写入（INSERT TMP_ → UPDATE）在进程崩溃时可能遗留 TMP_ 开头的垃圾行，DB 中无清理机制。
+- **_next_id 共用计数器**：`NewConnection()` 和 `RunAfterInLoop()` 共用 `_next_id` 自增，虽然后者将 task ID 注册在 base loop 时间轮，前者将连接 ID 注册在 sub loop 时间轮，不会互相取消，但语义不清，后续增加定时器功能时容易踩坑。
+- **单 Acceptor 瓶颈**：单 listener 在极端短连接场景（>5 万 accept/s）可能成为瓶颈，多核下可改用 `SO_REUSEPORT` + 多 Acceptor。
+- **无背压机制**：输出缓冲区无上限，慢客户端可撑爆服务端内存。
+- **HTTP 解析不完整**：不支持 chunked 编码、Trailer 头、`Expect: 100-continue`。
+- **日志系统 `vasprintf` 开销**：每条日志调用 `vasprintf` 分配堆内存格式化，高频路径下 malloc/free 对性能有可见影响，可改用栈上固定缓冲区 + `vsnprintf`。
+- **无安全机制**：无 TLS、无连接数限制、无请求速率限制。
+- **时间轮精度粗**：1s tick，不适用于毫秒级超时。
+
 ## 项目编译
 
 项目编译时是基于cmake的，拉取后使用cmake编译即可

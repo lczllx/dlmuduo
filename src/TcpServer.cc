@@ -82,5 +82,17 @@ void TcpServer::NewConnection(int fd)
 void TcpServer::RunAfterInLoop(const std::function<void()> &task, int delay)
 {
     _next_id++;
-    _base_loop.TimerAdd(_next_id, delay, task); 
+    _base_loop.TimerAdd(_next_id, delay, task);
+}
+
+void TcpServer::Stop()
+{
+    // 1. 关闭所有连接：逐一 ShutdownInLoop，连接释放由 Connection::Release 的 TasksInLoop 排队执行
+    for(auto &pair : _connections) {
+        pair.second->Shutdown();
+    }
+    // 2. 停止从属线程池（停止所有 Sub Reactor 的 EventLoop 并 join 线程）
+    _pool.Stop();
+    // 3. 停止主循环（base loop 的 Start() 退出，_connections 清理由上一步 RunAllTask drain 完成）
+    _base_loop.Stop();
 }

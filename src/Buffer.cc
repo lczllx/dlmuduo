@@ -21,6 +21,10 @@ void Buffer::MoveWriteoffset(uint64_t len)
     _write_idx += len;
 }
 
+// 缓冲区整理策略（避免不必要的扩容）：
+// 1. 尾部空间够 → 不操作
+// 2. 头部+尾部空间够 → std::copy 将可读数据搬到起始位置，归并碎片
+// 3. 以上都不够 → resize 扩容到恰好容纳（不预扩，节约内存）
 void Buffer::EnsureWritableBytes(uint64_t len)
 {
     if (TailIdleSize() >= len)

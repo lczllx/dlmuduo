@@ -18,7 +18,7 @@ private:
     std::unordered_map<int, Channel *> _channels;//管理描述符和对应的channel
 
     void Update(Channel *channel, int op);//根据具体操作类型更新epoll
-    bool HasChannel(Channel *channel);//查找需要更新事件的描述符存不存在
+    bool HasChannel(Channel *channel);//判断 fd 是否已被 Poller 管理，用于区分 ADD/MOD
 
 public:
     Poller();

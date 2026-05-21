@@ -12,14 +12,16 @@ private:
     std::mutex _mutex;
     std::condition_variable _cond;//条件变量 结合互斥锁实现loop获取同步关系
 
-    EventLoop* _loop;//在线程内实例化eventloop指针
+    EventLoop* _loop;//在线程内实例化eventloop指针，ThreadEntry 返回前置 nullptr
     std::thread _thread;//eventloop对应线程
 
     void ThreadEntry();//实例化eventloop对象并启动eventloop
 
 public:
     LoopThread();
+    ~LoopThread();
     EventLoop* Getloop();
+    void Stop();//停止 EventLoop 并等待线程退出
 };
 
 #endif

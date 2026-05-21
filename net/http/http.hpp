@@ -455,13 +455,13 @@ class HttpRequest
 class HttpResponse
 {
     public:
-    int _statu;///状态码
-    bool _redirect_flag;//重定向设置符
-    bool _deferred;//异步处理标记
-    std::string _body;//响应正文
-    std::string _redirect_url;//重定向的url
-    std::unordered_map<std::string,std::string>_headers;//头部字段
-    PtrConnection _conne;//异步handler通过它发回响应
+    int _statu;            // 状态码
+    bool _redirect_flag;   // 是否返回 302 重定向
+    bool _deferred;        // 异步处理标记：设为 true 后框架不立即发送响应，等待异步回调完成
+    std::string _body;     // 响应正文
+    std::string _redirect_url; // 重定向目标 URL
+    std::unordered_map<std::string, std::string> _headers; // 响应头部字段
+    PtrConnection _conne;  // 持有连接 shared_ptr，确保异步回调时连接仍存活
 
     public:
     HttpResponse():_statu(200),_redirect_flag(false),_deferred(false){}
@@ -698,7 +698,9 @@ class HttpContext
     int RespStatu(){return _resp_statu;}
     HttpRecvStatus RecvStatu(){return _recv_statu;}
     HttpRequest& Request(){return _request;}
-    //接收并解析http请求
+    // HTTP 请求解析状态机
+    // 使用 [[fallthrough]] 级联：一次 Receive 可能跨越多个阶段
+    // 例如 LINE 解析完直接进入 HEAD，HEAD 解析完直接进入 BODY，中途缓冲区不足则 return 等待
     void RecvHttpRequest(Buffer *buf)
     {
         //LCZ_DEBUG("开始解析HTTP请求,当前状态: %d", (int)_recv_statu);
@@ -871,44 +873,44 @@ class HttpServer
     }
     //设置上下文
     void OnConnected(const PtrConnection &conne){conne->SetContext(HttpContext());LCZ_DEBUG("newconnection %p", conne.get());}
-    //缓冲区数据解析处理
+    // 缓冲区数据解析处理
+    // 支持流水线（pipelining）：while 循环一次处理多个完整请求
+    // 支持异步 handler：_deferred 标记后暂停处理，等异步回调完成再继续
     void OnMessage(const PtrConnection &conne,Buffer *buf)
     {
         while(buf->ReadableBytes()>0)
         {
-            //获取上下文
             HttpContext *context=conne->GetContext()->get<HttpContext>();
-            if (context->_async_pending) return;//异步handler执行中，暂不处理后续请求
-            //通过上下文对接收缓冲区数据进行解析，得到httprequest对象
+            if (context->_async_pending) return;//上一条异步请求未完成，暂停处理后续请求
             context->RecvHttpRequest(buf);
              //LCZ_DEBUG("解析后状态: %d, 响应码: %d", (int)context->RecvStatu(), context->RespStatu());
             HttpResponse resp(context->RespStatu());//根据响应状态码构建resp
             HttpRequest &req=context->Request();
-            if(context->RespStatu()>=400)//---这里出错了，感觉是这里的问题
+            if(context->RespStatu()>=400)
             {
                 LCZ_DEBUG("检测到错误，关闭连接。状态: %d", (int)context->RecvStatu());
                 ErrorHandler(req,&resp);//填充一个错误页面给resp
                 WriteResponse(conne,req,&resp);//组织发送给客户端
-                context->ReSet();//-
-                buf->MoveReadoffset(buf->ReadableBytes());//出错了就把缓冲区数据清空//-
-                conne->Shutdown();//关闭连接
+                context->ReSet();
+                buf->MoveReadoffset(buf->ReadableBytes());//出错清空缓冲区残余数据
+                conne->Shutdown();
                 return;
             }
             if(context->RecvStatu()!=HttpRecvStatus::RECV_HTTP_OVER)
-            {//如果没有接收完毕，那么现在缓冲区的数据不是完整的，等下一次处理
+            {//请求不完整，等下一次数据到达
                 return;
             }
             //让handler能拿到连接，异步handler需要它来发回响应
             resp._conne=conne;
             //请求路由和处理业务
             Route(req,&resp);
-            if(resp._deferred){//异步handler接管，稍后自己WriteResponse+ReSet
+            if(resp._deferred){//异步handler接管响应发送和上下文重置
                 context->_async_pending=true;
                 return;
             }
-            //对httpresponse进行组织发送
+            //同步handler：组织发送响应
             WriteResponse(conne,req,&resp);
-            //重置上下文
+            //重置上下文，准备处理缓冲区中下一个请求（流水线）
             context->ReSet();
             //根据长短链接判断是否需要继续处理
             if(req.IsClose()){conne->Shutdown();}

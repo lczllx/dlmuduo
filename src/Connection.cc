@@ -35,26 +35,27 @@ void Connection::HandleRead()
     }
 }
 
-// 描述符触发可写事件后调用的函数，将输出缓冲区的数据进行发送
+// 可写事件回调：NonBlockSend 尽力发送，能发多少发多少
+// LT 模式下，若未发完内核会持续通知可写，不会丢数据
 void Connection::HandleWrite()
 {
     ssize_t ret = _socket.NonBlockSend(_out_buffer.GetReadPtr(), _out_buffer.ReadableBytes());
     if (ret < 0)
-    { 
+    {
         if (_in_buffer.ReadableBytes() > 0)
         {
             _message_cb(shared_from_this(), &_in_buffer);
         }
-        return Release();//关闭连接
+        return Release();//发送失败，关闭连接
     }
     _out_buffer.MoveReadoffset(ret);      // 将读偏移向后移动
-    if (_out_buffer.ReadableBytes() == 0) // 解决输出缓冲区没有数据可写，不断触发写事件造成的loopbusy
+    if (_out_buffer.ReadableBytes() == 0) // 输出缓冲区空，关闭写监控避免 busy loop
     {
-        _conne_channel.DisableWrite();//关闭写事件监控
-        // 如果没有数据且status处于DISCONNECTING
+        _conne_channel.DisableWrite();
+        // DISCONNECTING 状态下，数据发完即可安全关闭
         if (_status == DISCONNECTING)
         {
-            return Release();//关闭连接
+            return Release();
         }
     }
 }
@@ -109,12 +110,14 @@ void Connection::ReleaseInLoop()
         _server_closed_cb(shared_from_this()); // 移除服务器内部管理的链接信息
 }
 
+// 半关闭状态机：先停读，等输出缓冲区排空后再真正释放
+// 流程：CONNECTED → DISCONNECTING → (输出缓冲区排空) → Release() → DISCONNECTED
 void Connection::ShutdownInLoop()
 {
     if (_status == DISCONNECTED || _status == DISCONNECTING)
-        return;                   // 状态判断
-    _status = DISCONNECTING;      // 设置为半关闭状态
-    _conne_channel.DisableRead(); // 关闭读事件---
+        return;
+    _status = DISCONNECTING;      // 进入半关闭：不再接收新数据
+    _conne_channel.DisableRead(); // 停止读监控
     if (_in_buffer.ReadableBytes() > 0)
     {
         if (_message_cb)
@@ -123,9 +126,9 @@ void Connection::ShutdownInLoop()
     if (_out_buffer.ReadableBytes() > 0)
     {
         if (!_conne_channel.WriteAble())
-            _conne_channel.EnableWrite();
+            _conne_channel.EnableWrite(); // 还有数据未发，保持写监控，等 HandleWrite 排空后 Release
     }
-    if (_out_buffer.ReadableBytes() == 0)//没数据或发送完就关闭连接
+    if (_out_buffer.ReadableBytes() == 0) // 无待发数据，直接关闭
     {
         Release();
     }
@@ -194,10 +197,11 @@ void Connection::Shutdown()
     _loop->RunInLoop(std::bind(&Connection::ShutdownInLoop, this));
 }
 
+// Release 必须用 TasksInLoop 而非 RunInLoop：
+// Channel 回调栈内调用 Release → RunInLoop 会同步执行 → Connection 立即析构
+// → 回到 HandleEvent 后访问已释放的 event_cb → use-after-free
 void Connection::Release()
 {
-    // 必须始终入队，不能同步执行：若在 Channel 回调中调用，同步执行会立即销毁
-    // Connection，而 HandleEvent 尚未返回，后续还会调用 event_cb，导致 use-after-free
     _loop->TasksInLoop(std::bind(&Connection::ReleaseInLoop, this));
 }
 

@@ -9,6 +9,8 @@ Acceptor::Acceptor(EventLoop* loop, int port)
 
 void Acceptor::HandleRead() {
     int newfd = _socket.Accept();
+    // LT 模式下 accept 返回 -1 通常意味着连接已被内核处理（对方 RST 或已 accept），忽略即可
+    // 非阻塞 socket 不会阻塞在这里
     if(newfd < 0) return;
     if(_acpt_cb) _acpt_cb(newfd);
 }

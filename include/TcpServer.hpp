@@ -12,8 +12,8 @@ class TcpServer {
 private:
     uint64_t _next_id;//连接id -目前是自增，可以做其他实现
     int _port;//服务器监听的端口
-    int _timeout;//超时时间
-    bool _enable_inactive_release;//是否启动非活跃连接销毁
+    int _timeout;//非活跃连接超时秒数
+    bool _enable_inactive_release;//是否启用非活跃连接自动断开
     EventLoop _base_loop;//主reactor
     Acceptor _acceptor;//监听套接字的管理对象
     LoopThreadPool _pool;//从属线程池
@@ -35,7 +35,7 @@ private:
 
 public:
     TcpServer(int port);
-    void SetThreadCnt(int cnt);//设置线程池数量
+    void SetThreadCnt(int cnt);//设置 Sub Reactor 线程数量，必须在 Start() 前调用
 
     //设置回调
     void SetConnectedCallBack(const ConnectedCallBack& connected_cb);
@@ -44,9 +44,10 @@ public:
     void SetAnyEventCallBack(const AnyEventCallBack& event_cb);
     void SetServerClosedCallBack(const ClosedCallBack& cb);
 
-    void EnableInactiveRelease(int timeout);//启动非活跃连接销毁
-    void RunAfter(const std::function<void()>& task, int delay);//delay秒过后执行任务一个task
-    void Start();//启动
+    void EnableInactiveRelease(int timeout);//启动非活跃连接自动断开，timeout 单位秒
+    void RunAfter(const std::function<void()>& task, int delay);//一次性定时任务，delay 秒后执行
+    void Start();//创建线程池 → 注册新连接回调 → 启动监听 → 进入主事件循环（阻塞）
+    void Stop();//优雅退出：断开所有连接 → 停止从属线程池 → 停止主循环
 };
 
 #endif

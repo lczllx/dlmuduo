@@ -38,17 +38,17 @@ bool Poller::HasChannel(Channel *channel) //
     }
     return true;
 }
-// 添加或修改监控
+// 添加或修改监控：首次 ADD，后续 MOD
+// HasChannel 用 _channels map 判断是否已注册，避免每次用 EPOLL_CTL_ADD 覆盖
 void Poller::UpdateEvent(Channel *channel)
 {
     bool ret = HasChannel(channel);
     if (ret == false)
     {
-        // 不存在则添加
         _channels.insert(std::make_pair(channel->Fd(), channel));
         return Update(channel, EPOLL_CTL_ADD);
     }
-    return Update(channel, EPOLL_CTL_MOD); // 仅首次添加时执行 ADD
+    return Update(channel, EPOLL_CTL_MOD);
 }
 // 移除监控
 void Poller::RemoveEvent(Channel *channel)
@@ -64,8 +64,8 @@ void Poller::RemoveEvent(Channel *channel)
 // void Poll(std::vector<Channel*>&active)///感觉问题在这里
 void Poller::Poll(std::vector<Channel *> *active)
 {
-    // int epoll_wait(int epfd,struct epoll_even *evs,int maxevents,int timeout)
-    int nfds = epoll_wait(_epfd, _evs.data(), MAX_EPOLLEVENTS, -1); //-1为阻塞监控
+    // timeout=-1：无限阻塞直到有事件。只有 eventfd wakeup 或定时器 timerfd 到期才会返回
+    int nfds = epoll_wait(_epfd, _evs.data(), MAX_EPOLLEVENTS, -1);
     if (nfds < 0)
     {
         // EINTR 阻塞被信号打断了
