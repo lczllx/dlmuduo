@@ -14,6 +14,7 @@ Poller::Poller() : _evs(MAX_EPOLLEVENTS)
         LCZ_ERROR("epoll create failed");
         abort();
     }
+    LCZ_DEBUG("Poller created epfd=%d", _epfd);
 }
 
 void Poller::Update(Channel *channel, int op)
@@ -29,7 +30,7 @@ void Poller::Update(Channel *channel, int op)
     }
 }
 
-bool Poller::HasChannel(Channel *channel) //
+bool Poller::HasChannel(Channel *channel)
 {
     auto it = _channels.find(channel->Fd());
     if (it == _channels.end())
@@ -61,14 +62,11 @@ void Poller::RemoveEvent(Channel *channel)
     Update(channel, EPOLL_CTL_DEL);
 }
 // 开始监控，返回活跃链接
-// void Poll(std::vector<Channel*>&active)///感觉问题在这里
 void Poller::Poll(std::vector<Channel *> *active)
 {
-    // timeout=-1：无限阻塞直到有事件。只有 eventfd wakeup 或定时器 timerfd 到期才会返回
     int nfds = epoll_wait(_epfd, _evs.data(), MAX_EPOLLEVENTS, -1);
     if (nfds < 0)
     {
-        // EINTR 阻塞被信号打断了
         if (errno  == EINTR)
         {
             LCZ_DEBUG("epoll_wait interrupted by signal");
@@ -79,10 +77,8 @@ void Poller::Poll(std::vector<Channel *> *active)
     }
     for (int i = 0; i < nfds; i++)
     {
+        LCZ_DEBUG("Poller::Poll() epfd=%d fd=%d events=0x%x", _epfd, _evs[i].data.fd, _evs[i].events);
         auto it = _channels.find(_evs[i].data.fd);
-        // assert(it != _channels.end());
-        // it->second->SetREvent(_evs[i].events);
-        // active->push_back(it->second);
         if (it != _channels.end())
         {
             Channel* channel = it->second;

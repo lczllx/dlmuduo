@@ -1,19 +1,19 @@
 #include "../include/LoopThread.hpp"
+#include "../include/log_system/lcz_log.h"
 
-// 构造函数直接启动线程，线程可能在构造函数返回前开始运行
-// 此时 _loop 仍为 nullptr，外部 Getloop() 通过条件变量等待 _loop 非空
 LoopThread::LoopThread() : _loop(nullptr), _thread(std::thread(&LoopThread::ThreadEntry, this)) {}
 
-// 线程入口：栈上分配 EventLoop，Start() 阻塞直到 Stop() 被调用
-// Start() 返回后置 _loop=nullptr，防止外部通过悬空指针访问已析构的栈对象
+// 线程入口：栈上分配 EventLoop，Start() 阻塞直到进程退出
 void LoopThread::ThreadEntry() {
+    LCZ_DEBUG("ThreadEntry() begin");
     EventLoop loop;
+    LCZ_DEBUG("ThreadEntry() EventLoop constructed, entering Start()");
     {
         std::unique_lock<std::mutex> lock(_mutex);
         _loop = &loop;
         _cond.notify_all();//loop实例化完唤醒可能的阻塞
     }
-    loop.Start();//启动eventloop，阻塞直到 Stop() 被调用
+    loop.Start();//启动eventloop，阻塞直到进程退出
     {
         std::unique_lock<std::mutex> lock(_mutex);
         _loop = nullptr;
@@ -33,19 +33,7 @@ EventLoop* LoopThread::Getloop() {
 }
 
 LoopThread::~LoopThread() {
-    Stop();
-}
-
-// 停止 EventLoop 并等待线程退出
-// 先通过 _loop 指针调用 Stop() 唤醒 epoll_wait，再 join 等待 ThreadEntry 返回
-void LoopThread::Stop() {
-    {
-        std::unique_lock<std::mutex> lock(_mutex);
-        if (_loop) {
-            _loop->Stop();// 设置 _running=false + wakeup eventfd，使 Start() 退出
-        }
-    }
     if (_thread.joinable()) {
-        _thread.join();// 等待 ThreadEntry 返回，EventLoop 栈对象安全析构
+        _thread.join();
     }
 }

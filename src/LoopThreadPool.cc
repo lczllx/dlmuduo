@@ -24,11 +24,3 @@ EventLoop* LoopThreadPool::NextLoop() {
     _next_loop_idx = (_next_loop_idx + 1) % _thread_cnt;
     return _loop[_next_loop_idx];
 }
-
-void LoopThreadPool::Stop() {
-    for(auto &t : _threads) {
-        if(t) t->Stop();// 逐个停止每个 LoopThread：Stop() → join() → EventLoop 栈对象安全析构
-    }
-    _threads.clear();
-    _loop.clear();
-}

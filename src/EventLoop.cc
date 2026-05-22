@@ -5,35 +5,27 @@
 #include <cerrno>
 
 
-EventLoop::EventLoop() : 
+EventLoop::EventLoop() :
     _thread_id(std::this_thread::get_id()),
     _eventfd(CreateEventfd()),
     _event_channel(new Channel(this, _eventfd)),
     _timerwheel(this) {
-    //添加可读事件回调 启动eventfd的事件监控
     _event_channel->SetReadCallback(std::bind(&EventLoop::ReadEventfd, this));
     _event_channel->EnableRead();
+    LCZ_DEBUG("EventLoop constructed this=%p efd=%d", (void*)this, _eventfd);
 }
 
-// 主循环：epoll_wait → 处理 IO 事件 → 执行任务队列
-// Stop() 将 _running 设为 false 并 wakeup eventfd 后，循环退出
 void EventLoop::Start() {
-    _running = true;
-    while(_running) {
+    LCZ_DEBUG("EventLoop::Start() tid=%lu",
+              (unsigned long)std::hash<std::thread::id>()(std::this_thread::get_id()));
+    while(true) {
         std::vector<Channel*> actives;
         _poller.Poll(&actives);
         for(auto &e : actives) {
-            e->HandleEvent();//处理io
+            e->HandleEvent();
         }
-        RunAllTask();//执行任务池任务
+        RunAllTask();
     }
-    // 退出前排空任务队列：Stop() 或 Release() 可能通过 TasksInLoop 投递了清理任务
-    RunAllTask();
-}
-
-void EventLoop::Stop() {
-    _running = false;
-    WeakupEventfd();// 唤醒可能因无事件而阻塞在 epoll_wait 的 Start()
 }
 
 // swap 到栈上再执行：减小临界区（只持有锁做 swap），避免在执行回调时持有锁导致死锁

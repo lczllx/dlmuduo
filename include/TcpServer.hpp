@@ -47,7 +47,6 @@ public:
     void EnableInactiveRelease(int timeout);//启动非活跃连接自动断开，timeout 单位秒
     void RunAfter(const std::function<void()>& task, int delay);//一次性定时任务，delay 秒后执行
     void Start();//创建线程池 → 注册新连接回调 → 启动监听 → 进入主事件循环（阻塞）
-    void Stop();//优雅退出：断开所有连接 → 停止从属线程池 → 停止主循环
 };
 
 #endif

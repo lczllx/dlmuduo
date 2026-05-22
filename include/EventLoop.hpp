@@ -14,13 +14,10 @@
 #include "Logger.hpp"
 #include "Poller.hpp"
 #include "Timer.hpp"
-#include <atomic>
-
 /*One Loop Per Thread 模型核心：每个线程绑定一个 EventLoop
   主循环：epoll_wait(永久阻塞，-1) → 处理就绪事件 → 执行任务队列 → 回到 epoll_wait
   跨线程唤醒：RunInLoop 判断是否在本线程，不在则 TasksInLoop+eventfd 唤醒
   线程安全：RunInLoop/TasksInLoop 通过 mutex+eventfd 实现跨线程安全投递
-  优雅退出：Stop() 设置 _running=false + 唤醒 eventfd → Start() 退出循环 → 最后排空任务队列
   调试：AssertInLoop() 用于断言当前在 EventLoop 线程内*/
 class Channel;
 class LoopThread;
@@ -29,7 +26,6 @@ class EventLoop
 private:
     std::thread::id _thread_id; // 创建时记录本线程ID，用于 IsInLoop() 校验
     int _eventfd;               // 跨线程唤醒：写入8字节触发可读，打断 epoll_wait 永久阻塞
-    std::atomic<bool> _running{false}; // 运行标志，Stop() 设为 false 后 Start() 退出主循环
     Poller _poller;
     std::unique_ptr<Channel> _event_channel; // eventfd 对应的 Channel
     using Tasks = std::function<void()>;
@@ -44,8 +40,7 @@ private:
 
 public:
     EventLoop();
-    void Start(); // 启动事件循环，阻塞直到 Stop() 被调用
-    void Stop();  // 设置 _running=false 并通过 eventfd 唤醒，使 Start() 退出（线程安全）
+    void Start(); // 启动事件循环，阻塞直到进程退出
     // 若当前在 EventLoop 线程则直接执行，否则入队并通过 eventfd 唤醒（减少锁+唤醒开销）
     void RunInLoop(const Tasks &t);
     // 始终入队，不判断当前线程——用于必须延迟执行或在析构路径中使用的场景

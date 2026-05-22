@@ -21,7 +21,6 @@ public:
     LoopThread();
     ~LoopThread();
     EventLoop* Getloop();
-    void Stop();//停止 EventLoop 并等待线程退出
 };
 
 #endif
