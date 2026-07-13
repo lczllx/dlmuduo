@@ -54,10 +54,10 @@ jobs:
         run: |
           ../bin/test &
           SERVER_PID=$!
-          sleep 1
-          # 发 3 条消息，预期收到回显
+          sleep 3
+          # 发 3 条消息，预期收到回显（服务器端口 8889）
           for i in 1 2 3; do
-            echo "hello_$i" | timeout 5 nc localhost 8888 || {
+            echo "hello_$i" | timeout 5 nc localhost 8889 || {
               echo "::error title=Smoke test failed::Echo 客户端连接或回显失败"
               kill $SERVER_PID 2>/dev/null
               exit 1
