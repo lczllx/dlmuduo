@@ -18,8 +18,15 @@ set(SOURCES
 # 创建静态库
 add_library(lczmuduo STATIC ${SOURCES})
 
-# 设置库的链接库
-target_link_libraries(lczmuduo pthread)
+# 库的公开头文件目录（链接此库的目标自动获得 include 路径）
+target_include_directories(lczmuduo
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include/lczmuduo>
+)
+
+# 线程库（替代裸 pthread）
+target_link_libraries(lczmuduo PUBLIC Threads::Threads)
 
 # 安装静态库
 install(TARGETS lczmuduo

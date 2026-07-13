@@ -59,7 +59,7 @@ public:
         return success;
     }
 
-    bool expire(const std::string &key, int ttl_sec)
+    bool Expire(const std::string &key, int ttl_sec)
     {
         redisContext *c = Acquire();
         if (!c) return false;

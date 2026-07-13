@@ -1,5 +1,5 @@
-#ifndef __M_UTILITY_H__
-#define __M_UTILITY_H__
+#ifndef LCZ_UTILITY_H
+#define LCZ_UTILITY_H
 /*实用工具类：
 1.获取系统时间
 2.获取文件大小

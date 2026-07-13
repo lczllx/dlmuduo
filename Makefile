@@ -1,29 +1,33 @@
-.PHONY: start stop restart build clean logs status
+.PHONY: doctor setup build start stop restart clean logs status
 
-start:
-	@bash start.sh --build
+doctor:
+	@bash autobuild/docker.sh doctor
 
-stop:
-	@bash start.sh --stop
-
-restart:
-	@bash start.sh --stop
-	@bash start.sh --build
+setup:
+	@bash autobuild/docker.sh setup
 
 build:
-	docker build -t shortener-app:latest -f Dockerfile .
+	@bash autobuild/docker.sh build
+
+start:
+	@bash autobuild/docker.sh compose
+
+stop:
+	@docker compose down
+
+restart:
+	@docker compose down
+	@bash autobuild/docker.sh compose
 
 clean:
-	@bash start.sh --stop
-	docker volume rm shortener-mysql-data 2>/dev/null || true
-	docker rmi shortener-app:latest 2>/dev/null || true
+	@bash autobuild/docker.sh clean
 
 logs:
-	docker logs -f shortener-app
+	@docker compose logs -f app
 
 status:
 	@echo "=== 容器状态 ==="
-	@docker ps --filter "name=shortener-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@docker compose ps
 	@echo ""
 	@echo "=== 数据卷 ==="
 	@docker volume ls --filter "name=shortener-" --format "table {{.Name}}\t{{.Driver}}"

@@ -1,11 +1,41 @@
-# LCZMuduo - 高性能 C++ 网络库
+# dlmuduo - 高性能 C++ 网络库
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+> A high-performance C++14 network library — a rewrite of Chen Shuo's muduo, replacing Boost with modern C++ standard library. Features an event-driven Reactor pattern with multi-threaded I/O, HTTP server, and URL shortener application.
 
 **作者**：lczllx  
 **邮箱**：2181719471@qq.com  
 **GitHub**: [lczllx](https://github.com/lczllx)  
-**开发环境**：Ubuntu VS Code  
-**编译器**：g++  
-**编程语言**：C++
+
+## 快速开始
+
+```cpp
+#include <lczmuduo/TcpServer.hpp>
+#include <lczmuduo/Buffer.hpp>
+
+int main() {
+    TcpServer server(8889);
+    server.SetThreadCnt(4);
+    server.SetMessageCallback([](const PtrConnection&, Buffer* buf) {
+        std::string msg = buf->ReadAsstringandpop(buf->ReadableBytes());
+        // 处理消息
+    });
+    server.Start();
+    return 0;
+}
+```
+
+```bash
+# 安装网络库
+bash autobuild/deps.sh && sudo bash autobuild/install.sh
+
+# 编译你的程序
+g++ your_code.cpp -llczmuduo -lpthread -o your_program
+
+# Docker 部署短链接服务
+bash autobuild/docker.sh setup
+```
 
 ## 测试环境
 
@@ -16,20 +46,27 @@
 | 编译器 | g++ 12.3.0 |
 | 构建工具 | CMake 3.22.1 |
 
-## 如何复现
+## 构建与运行
 
 ```bash
-git clone https://github.com/lczllx/muduo.git
-cd muduo
+git clone https://github.com/lczllx/dlmuduo.git
+cd dlmuduo
+
+# 自动安装依赖
+bash autobuild/deps.sh
+
+# 编译
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
+
+# 运行
 ../bin/test              # Echo 服务
 ../bin/http_server       # HTTP 服务（/hello 等路由）
 ../bin/shortener_server  # 短链接服务（需 MySQL + Redis）
 ```
 
-短链接服务依赖 MySQL 和 Redis，可通过环境变量配置：
+短链接服务依赖 MySQL 和 Redis，环境变量配置：
 
 ```bash
 export MYSQL_HOST=127.0.0.1 MYSQL_PORT=3306 MYSQL_USER=root MYSQL_PASS=shortener MYSQL_DB=shortener
@@ -37,11 +74,12 @@ export REDIS_HOST=127.0.0.1 REDIS_PORT=6379
 ../bin/shortener_server
 ```
 
-Docker（仓库根目录 `Dockerfile`，Alpine 3.19 多阶段构建）：
+Docker 部署（Alpine 3.21 多阶段构建）：
 
 ```bash
-docker build -t lcz-muduo .
-docker run -p 8080:8080 lcz-muduo
+bash autobuild/docker.sh setup     # 一键：配网 + 构建 + 启动
+bash autobuild/docker.sh compose   # 启动 MySQL + Redis + App
+bash autobuild/docker.sh clean     # 停止清理
 ```
 
 压测复现（需要 `wrk`）：
@@ -77,31 +115,15 @@ docker run -p 8080:8080 lcz-muduo
 - **无安全机制**：无 TLS、无连接数限制、无请求速率限制。
 - **时间轮精度粗**：1s tick，不适用于毫秒级超时。
 
-## 项目编译
-
-项目编译时是基于cmake的，拉取后使用cmake编译即可
-```bash
-# 克隆项目
-git clone https://github.com/lczllx/muduo.git
-cd muduo
-
-# 编译项目
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-
-# 运行示例（从build目录）
-../bin/test         # Echo 服务
-../bin/http_server  # HTTP 服务（含 /hello 等路由）
-
-# 或者从项目根目录运行
-./bin/test
-./bin/http_server
-```
-
 ## 库的安装
 
-在项目源码的/autoinstall 目录里面有一个install.sh文件，直接用root权限运行即可编译和安装
+在项目源码的 `autobuild/` 目录中：
+
+```bash
+bash autobuild/deps.sh         # 自动拉取依赖
+sudo bash autobuild/install.sh # 安装网络库到系统
+sudo bash autobuild/install.sh ~/local  # 或安装到用户目录
+```
 
 ## 项目测试
 
@@ -116,12 +138,6 @@ make -j$(nproc)
 - `./scripts/bench/test_qps_cpu.sh` - 1 万 / 十万长连接下 QPS + CPU 采样
 - `./scripts/bench/test_100k_qps_memory.sh` - QPS + 内存（RSS/VSS）采样
 - `sudo ./scripts/bench/setup_100k_limits.sh` -  sysctl 调优（十万并发前建议执行）
-- 脚本说明汇总：`docs/BENCH_SCRIPTS.md`
-
-### 文档目录（`docs/`）
-
-性能、路由与序列化等说明均放在 **`docs/`**，例如：`PERFORMANCE_OPTIMIZATION.md`、`CPU_UTILIZATION_ANALYSIS.md`、`QPS_VARIATION_ANALYSIS.md`、`PERFORMANCE_TARGET.md`、`ROUTE_OPTIMIZATION_GUIDE.md`、`PROTOBUF_INTEGRATION_PLAN.md` 等。
-
 ### QPS 测试
 
 #### 跨机器内网压测（真实网络，2026-05-20）
@@ -205,13 +221,13 @@ make -j$(nproc)
 
 ### 部署
 
-Docker 多阶段构建（Alpine 3.19），`Dockerfile` 位于仓库根目录。
+Docker 多阶段构建（Alpine 3.21），`Dockerfile` 位于仓库根目录。
 
 ---
 
 ## 项目概述
 
-这是一个基于 C++11 开发的高性能网络库，主要是将陈硕的 muduo 网络库核心代码进行重写，将原来依赖boost库的地方都替换成了C++ 11语法，主要是为了学习、了解网络库的架构和组成，以及对网络编程的知识进行复习
+这是一个基于 C++14 开发的高性能网络库，将陈硕的 muduo 网络库核心代码进行重写，将原来依赖 Boost 库的地方都替换成了 C++ 标准库，主要是为了学习、了解网络库的架构和组成，以及对网络编程的知识进行复习
 
 ## muduo网络库的Reactor模型
 
@@ -832,6 +848,10 @@ void Connection::ReleaseInLoop()
 4. 主reactor在事件循环中等待新连接到来，当监听套接字有可读事件时，Acceptor的Channel触发HandleRead回调
 
 5. 当新连接到来时，Acceptor调用accept()获取新连接的fd，然后调用TcpServer::NewConnection()创建Connection对象，在线程池获取一个从属reactor绑定，设置Connection的各种回调，调用Established()启动读事件监控，该连接的所有操作都在绑定的reactor里面进行
+
+## 📄 License
+
+MIT © 2024 lczllx — 详见 [LICENSE](LICENSE) 文件。
 
 ## 🙏 致谢
 

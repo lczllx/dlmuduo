@@ -1,0 +1,68 @@
+# =============================================================================
+# dlmuduo — 高性能 C++14 网络库 CI
+# =============================================================================
+# 流程：编译核心库 + HTTP 服务器 → Echo 服务 smoke test
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake g++ make \
+            pkg-config libjsoncpp-dev libhiredis-dev libmysqlclient-dev
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build all targets
+        working-directory: build
+        run: cmake --build . -j$(nproc)
+
+      - name: Echo server smoke test
+        working-directory: build
+        run: |
+          ../bin/test &
+          SERVER_PID=$!
+          sleep 1
+          # 发 3 条消息，预期收到回显
+          for i in 1 2 3; do
+            echo "hello_$i" | timeout 5 nc localhost 8888 || {
+              echo "::error title=Smoke test failed::Echo 客户端连接或回显失败"
+              kill $SERVER_PID 2>/dev/null
+              exit 1
+            }
+          done
+          kill $SERVER_PID 2>/dev/null
+          wait $SERVER_PID 2>/dev/null || true
+          echo "Echo server smoke test PASSED"

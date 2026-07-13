@@ -1,5 +1,5 @@
-#ifndef __M_HTTP__
-#define __M_HTTP__
+#ifndef LCZ_HTTP_H
+#define LCZ_HTTP_H
 #include <iostream>
 #include <fstream>
 #include <string>

@@ -1,6 +1,7 @@
 #include "shortener.hpp"
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 
 void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
 {
@@ -26,7 +27,7 @@ void ApiShorten(const HttpRequest& req, HttpResponse* rsp)
 
     // 两步写入：先 INSERT 占位拿到自增 ID，用 ID 生成 short code，再 UPDATE 回写
     // TMP_ 前缀：占位值，避免 code 列唯一约束冲突；用 pid+seq 保证不同进程不碰撞
-    static std::atomic<long> seq{0};
+    static std::atomic<int64_t> seq{0};
     snprintf(sql, sizeof(sql),
         "INSERT INTO short_url (code, long_url) VALUES ('TMP_%d_%ld', '%s')",
         getpid(), ++seq, escaped);

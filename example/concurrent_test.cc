@@ -138,6 +138,7 @@ int main(int argc, char* argv[]) {
         }
 
         // 处理 epoll 中已就绪的连接（EINPROGRESS 完成），需多次 drain 避免 2048/4096 等上限
+        // 注意：evs[8192] ≈ 98KB 栈空间，musl (Alpine) 默认栈 128KB 需确保 ulimit -s >= 256
         struct epoll_event evs[8192];
         int drain_rounds = 0;
         while (drain_rounds++ < 20) {  // 每批最多多轮 drain，确保高并发时不积压
