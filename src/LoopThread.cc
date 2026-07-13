@@ -3,7 +3,7 @@
 
 LoopThread::LoopThread() : _loop(nullptr), _thread(std::thread(&LoopThread::ThreadEntry, this)) {}
 
-// 线程入口：栈上分配 EventLoop，Start() 阻塞直到进程退出
+// 线程入口：栈上分配 EventLoop，Start() 阻塞直到 Quit() 被调用
 void LoopThread::ThreadEntry() {
     LCZ_DEBUG("ThreadEntry() begin");
     EventLoop loop;
@@ -13,7 +13,7 @@ void LoopThread::ThreadEntry() {
         _loop = &loop;
         _cond.notify_all();//loop实例化完唤醒可能的阻塞
     }
-    loop.Start();//启动eventloop，阻塞直到进程退出
+    loop.Start();//启动eventloop，阻塞直到 Quit()
     {
         std::unique_lock<std::mutex> lock(_mutex);
         _loop = nullptr;
@@ -33,7 +33,13 @@ EventLoop* LoopThread::Getloop() {
 }
 
 LoopThread::~LoopThread() {
+    {
+        std::unique_lock<std::mutex> lock(_mutex);
+        if (_loop) {
+            _loop->Quit();  // 通知 loop 退出
+        }
+    }
     if (_thread.joinable()) {
-        _thread.join();
+        _thread.join();     // 等待线程退出
     }
 }

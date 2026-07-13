@@ -4,6 +4,7 @@ project(lczmuduo)
 
 # 构建选项
 option(BUILD_APPS "Build example and server applications" ON)
+option(BUILD_TESTS "Build unit tests (requires network for GTest download)" OFF)
 
 # C++ 标准
 set(CMAKE_CXX_STANDARD 14)
@@ -38,6 +39,9 @@ add_subdirectory(src)
 if(BUILD_APPS)
     add_subdirectory(example)
     add_subdirectory(net)
+endif()
+if(BUILD_TESTS)
+    add_subdirectory(tests)
 endif()
 
 # 安装头文件（同时匹配 .hpp 和 .h）

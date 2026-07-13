@@ -6,6 +6,7 @@
 
 
 EventLoop::EventLoop() :
+    _quit(false),
     _thread_id(std::this_thread::get_id()),
     _eventfd(CreateEventfd()),
     _event_channel(new Channel(this, _eventfd)),
@@ -15,16 +16,33 @@ EventLoop::EventLoop() :
     LCZ_DEBUG("EventLoop constructed this=%p efd=%d", (void*)this, _eventfd);
 }
 
+EventLoop::~EventLoop() {
+    Quit();
+    // _eventfd 不在析构函数体中提前 close，否则 _event_channel 析构时
+    // epoll_ctl(EPOLL_CTL_DEL, 已关闭fd) 导致 EBADF / segfault。
+    // Channel 析构 → Remove() → epoll_ctl(EPOLL_CTL_DEL) 自然完成清理，
+    // _eventfd 本身是 int，无析构函数，由 OS 在进程退出时回收。
+}
+
 void EventLoop::Start() {
     LCZ_DEBUG("EventLoop::Start() tid=%lu",
               (unsigned long)std::hash<std::thread::id>()(std::this_thread::get_id()));
-    while(true) {
+    while(!_quit) {
         std::vector<Channel*> actives;
         _poller.Poll(&actives);
         for(auto &e : actives) {
             e->HandleEvent();
         }
         RunAllTask();
+    }
+    // 退出前执行残留任务（如 Connection 的 Release 回调）
+    RunAllTask();
+}
+
+void EventLoop::Quit() {
+    _quit = true;
+    if (!IsInLoop()) {
+        WeakupEventfd();  // 跨线程调用：打断 epoll_wait
     }
 }
 

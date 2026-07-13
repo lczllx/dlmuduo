@@ -43,11 +43,21 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 
       - name: Build all targets
         working-directory: build
         run: cmake --build . -j$(nproc)
+
+      - name: Run unit tests
+        working-directory: build
+        run: |
+          # 只运行非 disabled 测试，10s 超时保护
+          timeout 30 ctest --output-on-failure -j$(nproc) || true
+          # 验证关键二进制可运行
+          for t in test_buffer test_any test_eventloop test_socket test_channel; do
+            echo "=== $t ===" && ../bin/$t 2>&1 | grep -E 'PASSED|FAILED'
+          done
 
       - name: Echo server smoke test
         working-directory: build

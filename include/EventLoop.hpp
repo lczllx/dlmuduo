@@ -10,6 +10,7 @@
 #include <sys/eventfd.h>
 #include <unistd.h>
 #include <cassert>
+#include <atomic>
 
 #include "Logger.hpp"
 #include "Poller.hpp"
@@ -17,6 +18,7 @@
 /*One Loop Per Thread 模型核心：每个线程绑定一个 EventLoop
   主循环：epoll_wait(永久阻塞，-1) → 处理就绪事件 → 执行任务队列 → 回到 epoll_wait
   跨线程唤醒：RunInLoop 判断是否在本线程，不在则 TasksInLoop+eventfd 唤醒
+  退出机制：Quit() 设置 _quit=true + eventfd 唤醒 → Start() 退出循环 → 执行残留任务 → 返回
   线程安全：RunInLoop/TasksInLoop 通过 mutex+eventfd 实现跨线程安全投递
   调试：AssertInLoop() 用于断言当前在 EventLoop 线程内*/
 class Channel;
@@ -24,35 +26,36 @@ class LoopThread;
 class EventLoop
 {
 private:
-    std::thread::id _thread_id; // 创建时记录本线程ID，用于 IsInLoop() 校验
-    int _eventfd;               // 跨线程唤醒：写入8字节触发可读，打断 epoll_wait 永久阻塞
+    std::thread::id _thread_id;
+    std::atomic<bool> _quit;     // Quit() 置 true，Start() 检查后退出循环
+    int _eventfd;
     Poller _poller;
-    std::unique_ptr<Channel> _event_channel; // eventfd 对应的 Channel
+    std::unique_ptr<Channel> _event_channel;
     using Tasks = std::function<void()>;
-    std::vector<Tasks> _task; // 任务队列，加锁后 swap 到栈上执行，减少锁持有时间
+    std::vector<Tasks> _task;
     std::mutex _mutex;
     TimingWheel _timerwheel;
 
-    void RunAllTask();          // 运行任务池所有任务
-    static int CreateEventfd(); // 创建eventfd
-    void ReadEventfd();         // 读取eventfd
-    void WeakupEventfd();       // 唤醒epoll_wait可能因为没有事件就绪而造成的阻塞
+    void RunAllTask();
+    static int CreateEventfd();
+    void ReadEventfd();
+    void WeakupEventfd();
 
 public:
     EventLoop();
-    void Start(); // 启动事件循环，阻塞直到进程退出
-    // 若当前在 EventLoop 线程则直接执行，否则入队并通过 eventfd 唤醒（减少锁+唤醒开销）
+    ~EventLoop();
+    void Start();                 // 启动事件循环，Quit() 可安全退出
+    void Quit();                  // 安全退出事件循环（可跨线程调用）
     void RunInLoop(const Tasks &t);
-    // 始终入队，不判断当前线程——用于必须延迟执行或在析构路径中使用的场景
     void TasksInLoop(const Tasks &t);
-    bool IsInLoop();                                                // 判断当前线程是不是在Eventloop所在线程里面
-    void UpdateEvent(Channel *channel);                             // 更新描述符的事件监控
-    void RemoveEvent(Channel *channel);                             // 移除描述符的事件监控
-    void TimerAdd(uint64_t id, uint32_t delay, const TaskFunc &cb); // 添加定时器
-    void TimerReflesh(uint64_t id);                                 // 刷新定时器
-    void TimerCancel(uint64_t id);                                  // 取消定时
-    bool HasTimer(uint64_t id);                                     // 是否有这个定时器
-    void AssertInLoop();                                            // 断言在eventloop线程里面
+    bool IsInLoop();
+    void UpdateEvent(Channel *channel);
+    void RemoveEvent(Channel *channel);
+    void TimerAdd(uint64_t id, uint32_t delay, const TaskFunc &cb);
+    void TimerReflesh(uint64_t id);
+    void TimerCancel(uint64_t id);
+    bool HasTimer(uint64_t id);
+    void AssertInLoop();
 };
 
 #endif

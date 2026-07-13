@@ -58,8 +58,8 @@ private:
     using WeakTask = std::weak_ptr<TimerTask>;
     int _tick;     // 当前槽位索引，每 tick 前进 1，模 _capacity 回绕
     int _capacity; // 时间轮槽数 = 360，最大延迟 359 秒
-    std::vector<std::vector<PtrTask>> _wheel; // 环形槽数组，每个槽存储 shared_ptr<TimerTask>
-    std::unordered_map<uint64_t, WeakTask> _timers; // id→weak_ptr 索引，不阻止槽清空时析构
+    std::unordered_map<uint64_t, WeakTask> _timers; // id→weak_ptr 索引（须在 _wheel 之前声明，确保析构时 _wheel 先销毁，其 TimerTask::_release_cb 回调 RemoveTimer 时 _timers 仍存活）
+    std::vector<std::vector<PtrTask>> _wheel;       // 环形槽数组，每个槽存储 shared_ptr<TimerTask>
 
     EventLoop *_loop;
     int _timefd; // 定时器描述符 可读事件回调就是读取计数器，执行定时任务

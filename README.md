@@ -93,17 +93,16 @@ bash autobuild/docker.sh clean     # 停止清理
 
 | 项目 | 数值 |
 |------|------|
-| 总行数 | 7,186 |
-| 自己写的行数 | 5,571（不含空行/注释） |
+| 总行数 | 7,116 |
 | 核心库 (src+include) | 3,867 行 |
 | HTTP+Shortener (net/) | 2,229 行 |
-| 源文件数 | 45 |
-| 单元测试 | 无（仅 `example/test.cc` 和 `concurrent_test.cc` 两个手工测试，共 299 行） |
-| 测试覆盖率 | ~0% |
+| 单元测试 (tests/) | 620 行 / 62 个用例 |
+| 源文件数 | 47 |
+| 测试文件数 | 11 |
 
 ## 已知缺陷
 
-- **无单元测试**：未引入 GTest，正确性仅靠手工 echo/HTTP 示例验证，回归依赖人工。
+- **测试覆盖不完整**：已引入 GTest，62 个用例覆盖 Buffer/Any/Socket/Channel/EventLoop/TimingWheel/Connection/LoopThread/LoopThreadPool/TcpServer 十个模块，但缺少 Acceptor/Poller/HTTP 解析的单元测试，集成测试需手动验证。
 - **MySQL 同步阻塞 I/O 线程**：Shortener 的 shorten 和 redirect 两条路径中，Redis miss 回源均走 `mysql_query()` 同步调用（单次 0.5–2ms），阻塞 Reactor I/O 线程，长尾延迟恶化。
 - **Redis Acquire() 阻塞 I/O 线程**：池满时 `Acquire()` 的 `_cond.wait()` 无超时，永久阻塞持锁的 Reactor I/O 线程；且池内连接断开后的 `redisReconnect()` / `redisConnect()` 是同步调用，可能阻塞数百毫秒。
 - **TMP_ 占位垃圾残留**：两步写入（INSERT TMP_ → UPDATE）在进程崩溃时可能遗留 TMP_ 开头的垃圾行，DB 中无清理机制。
